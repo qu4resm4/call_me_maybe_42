@@ -14,23 +14,15 @@ install: check
 	uv sync
 
 run: install
-	uv run python -m src \
-		--functions_definition $(FUNCTIONS_DEFINITION) \
-		--input $(DATA_INPUT) \
-		--output $(DATA_OUTPUT)
+	@clear
+	uv run python -m src --functions_definition $(FUNCTIONS_DEFINITION) --input $(DATA_INPUT) --output $(DATA_OUTPUT)
 
 run-no-install: check
 	@echo "Executando sem sincronizar dependências..."
-	uv run --no-sync python -m src \
-		--functions_definition $(FUNCTIONS_DEFINITION) \
-		--input $(DATA_INPUT) \
-		--output $(DATA_OUTPUT)
+	uv run --no-sync python -m src --functions_definition $(FUNCTIONS_DEFINITION) --input $(DATA_INPUT) --output $(DATA_OUTPUT)
 
 debug: install
-	uv run python -m pdb -m src \
-		--functions_definition $(FUNCTIONS_DEFINITION) \
-		--input $(DATA_INPUT) \
-		--output $(DATA_OUTPUT)
+	uv run python -m pdb -m src --functions_definition $(FUNCTIONS_DEFINITION) --input $(DATA_INPUT) --output $(DATA_OUTPUT)
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
