@@ -1,3 +1,16 @@
+#!/usr/bin/env python3
+# ########################################################################### #
+#   shebang: 1                                                                #
+#                                                          :::      ::::::::  #
+#   __main__.py                                          :+:      :+:    :+:  #
+#                                                      +:+ +:+         +:+    #
+#   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
+#                                                  +#+#+#+#+#+   +#+          #
+#   Created: 2026/06/16 15:50:25 by gquaresm            #+#    #+#            #
+#   Updated: 2026/06/23 21:32:41 by gquaresm           ###   ########.fr      #
+#                                                                             #
+# ########################################################################### #
+
 """
 Ponto de entrada da aplicação.
 
@@ -68,6 +81,8 @@ def main() -> int:
     Small_LLM_Model = import_or_exit()
     model = Small_LLM_Model()
     print(model)
+
+    # fazer loading dos arquivos 
     return 0
 
 

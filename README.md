@@ -16,6 +16,35 @@ TO-DO
 
 
 
+extender classe com calling functions
+
+métodos como
+-> invoke e etc
+-> invoke calling function?
+Tipar resposta normal e tipar resposta calling function
+
+
+
+
+
+
+
+
+[10:09, 6/21/2026] quaresma: extender classe com calling functions
+
+métodos como
+
+-> invoke e etc
+-> invoke calling function?
+[10:10, 6/21/2026] quaresma: Tipar resposta normal e tipar resposta calling function
+
+
+
+
+
+
+
+
 Check for bonus features (optional, not required for passing):
 • Support for multiple LLM models beyond Qwen/Qwen3-0.6B
 • Recoding the tokenizer: avoiding direct use of encode and decode in the main code,
