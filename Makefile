@@ -1,3 +1,11 @@
+# Variáveis para inserir nos processos filhos que iram trocar os caminhos de onde as ferramentas guardam o cache
+export UV_PROJECT_ENVIRONMENT = /home/$(USER)/goinfre/.venv
+export UV_CACHE_DIR = /home/$(USER)/goinfre/.uv_cache
+export UV_TOOL_DIR = /home/$(USER)/goinfre/.uv_tools
+export HF_HOME = /home/$(USER)/goinfre/hf_cache
+
+# Variáveis para definição nos comandos
+
 FUNCTIONS_DEFINITION = data/input/functions_definition.json
 DATA_INPUT = data/input/function_calling_tests.json
 DATA_OUTPUT = data/output/function_calls.json
@@ -11,6 +19,9 @@ check:
 		(echo "'uv' não encontrado.\n Consulte as instruções no README.md ou instale em https://astral.sh/uv/#installation"; exit 1)
 
 install: check
+	mkdir -p $(UV_CACHE_DIR)
+	mkdir -p $(UV_TOOL_DIR)
+	mkdir -p $(HF_HOME)
 	uv sync
 
 run: install
