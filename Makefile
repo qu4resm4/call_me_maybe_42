@@ -1,8 +1,13 @@
 # Variáveis para inserir nos processos filhos que iram trocar os caminhos de onde as ferramentas guardam o cache
-export UV_PROJECT_ENVIRONMENT = /home/$(USER)/goinfre/.venv
-export UV_CACHE_DIR = /home/$(USER)/goinfre/.uv_cache
-export UV_TOOL_DIR = /home/$(USER)/goinfre/.uv_tools
-export HF_HOME = /home/$(USER)/goinfre/hf_cache
+#export UV_PROJECT_ENVIRONMENT = /home/$(USER)/goinfre/.venv
+#export UV_CACHE_DIR = /home/$(USER)/goinfre/.uv_cache
+#export UV_TOOL_DIR = /home/$(USER)/goinfre/.uv_tools
+#export HF_HOME = /home/$(USER)/goinfre/hf_cache
+
+export UV_PROJECT_ENVIRONMENT = /home/$(USER)/sgoinfre/.venv
+export UV_CACHE_DIR = /home/$(USER)/sgoinfre/.uv_cache
+export UV_TOOL_DIR = /home/$(USER)/sgoinfre/.uv_tools
+export HF_HOME = /home/$(USER)/sgoinfre/hf_cache
 
 # Variáveis para definição nos comandos
 

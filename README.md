@@ -24,10 +24,25 @@ métodos como
 Tipar resposta normal e tipar resposta calling function
 
 
+não quero fazer um tokenizador proproi vai daR MUITO TRABALHO
+
+ENTÃO O FLUXO SERÁ O SUGERIDO:
+(prompts) -> tokenizador -> (tokens) -> conversor de input ids -> (input_ids) -> LLM processing -> (logits) -> geração token por token aplicando o restritor de JSON (constrained decoding) -> JSON vádilo 100% dos casos
 
 
+prompt -> Tokenization -> Input IDs -> LLM -> Logits -> Next Token Selection
+
+1. O modelo gera *logits* para todos os *tokens* possíveis.
+2. Você identifica quais *tokens* manteriam tanto uma estrutura JSON válida quanto a conformidade com o esquema esperado.
+3. Você define os *logits* dos *tokens* inválidos (aqueles que violam o esquema ou a estrutura) como menos infinito.
+4. Você realiza a amostragem apenas a partir dos *tokens* válidos restantes.
+
+Neste projeto, a decodificação com restrições deve não apenas garantir um JSON sintaticamente válido, mas também assegurar a conformidade com um esquema específico. Por exemplo, se um campo estiver restrito a um número no arquivo `functions_definition.json`, o decodificador limita a seleção de tokens a valores que correspondam a um número inteiro ou de ponto flutuante, preservando tanto a validade do JSON quanto a conformidade com o esquema. Isso garante que cada token gerado mantenha validade estrutural e semântica, respeitando o esquema exigido. Como resultado, o JSON produzido é totalmente recuperável e pode ser sempre analisado (parsed) sem erros.
 
 
+Pense em como você pode usar o arquivo JSON de vocabulário para mapear a relação entre
+tokens e suas representações em string. Isso é fundamental para
+determinar quais tokens são válidos em cada etapa da geração.
 
 
 [10:09, 6/21/2026] quaresma: extender classe com calling functions
