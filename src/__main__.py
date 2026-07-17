@@ -79,8 +79,11 @@ def import_or_exit() -> type:
 
 def main() -> int:
     Small_LLM_Model = import_or_exit()
-    model = Small_LLM_Model()
+    model: Small_LLM_Model = Small_LLM_Model()
     print(model)
+    print("vocab: ", model.get_path_to_vocab_file())
+    print("merges: ", model.get_path_to_merges_file())
+    print("tokenizer: ", model.get_path_to_tokenizer_file())
 
     # fazer loading dos arquivos 
     return 0
