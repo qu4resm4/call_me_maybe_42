@@ -24,7 +24,7 @@ endif
 # Ambiente específico da 42 Rio
 # ============================================================
 
-# Variáveis para inserir nos processos filhos que iram trocar os caminhos de onde as ferramentas guardam o cache
+# Variáveis para inserir nos processos filhos que iram trocar os caminhos de onde as ferramentas guardam o cache (especificamente para os computadores do laboratório da 42Rio)
 ifeq ($(USERNAME),gquaresm)
     export UV_PROJECT_ENVIRONMENT = /home/$(USER)/sgoinfre/.venv
     export UV_CACHE_DIR = /home/$(USER)/sgoinfre/.uv_cache
