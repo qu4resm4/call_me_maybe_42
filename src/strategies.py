@@ -1,5 +1,4 @@
-
-from abc import ABC, abstractmethod
+# from abc import ABC, abstractmethod
 
 # ESCOLHA DE TOKEN:
 # Greedy
@@ -10,15 +9,15 @@ from abc import ABC, abstractmethod
 # Trie
 # Grammar
 
-class TokenSelector(ABC):
+#    class TokenSelector(ABC):
 
-    @abstractmethod
-    def select(self, logits: np.ndarray) -> int:
-        pass
+#        @abstractmethod
+#        def select(self, logits: np.ndarray) -> int:
+#            pass
 
-class GreedySelector(TokenSelector):
-    def select(self, logits):
-        return int(np.argmax(logits))
+#    class GreedySelector(TokenSelector):
+#        def select(self, logits):
+#            return int(np.argmax(logits))
 
 # GreedySelector
 # TopKSelector
@@ -35,9 +34,11 @@ class GreedySelector(TokenSelector):
 
 
 # assinatura errada, o modelo nao deerica entrar aqui
-# a lista de ids de tokens viriam no parametro, saidno de um método usado da classe LLM
+# a lista de ids de tokens viriam no parametro, saidno de um método
+# usado da classe LLM
 # isso não deveria ser para desscobrir qual é o token aprovado (id token)
-# deveria ser a estrategia de como identificar se o token é ou não um dos tokens permitidos recebidos por parametros
+# deveria ser a estrategia de como identificar se o token é ou não um dos
+#  tokens permitidos recebidos por parametros
 # class TokenRestrictor(ABC):
 
 #     @abstractmethod
@@ -48,24 +49,24 @@ class GreedySelector(TokenSelector):
 #     ) -> set[int]:
 #         pass
 
-    # class TokenConstraint(ABC):
+# class TokenConstraint(ABC):
 
-    # @abstractmethod
-    # def allowed_tokens(
-    #     self,
-    #     generated_ids: list[int]
-    # ) -> set[int]:
-    #     pass
+# @abstractmethod
+# def allowed_tokens(
+#     self,
+#     generated_ids: list[int]
+# ) -> set[int]:
+#     pass
 
-    # class TokenConstraint(ABC):
+# class TokenConstraint(ABC):
 
-    # @abstractmethod
-    # def mask_logits(
-    #     self,
-    #     logits: list[float],
-    #     generated_ids: list[int]
-    # ) -> list[float]:
-    #     pass
+# @abstractmethod
+# def mask_logits(
+#     self,
+#     logits: list[float],
+#     generated_ids: list[int]
+# ) -> list[float]:
+#     pass
 
 #     mplementações:
 

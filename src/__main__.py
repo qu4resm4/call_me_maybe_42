@@ -6,15 +6,18 @@
 #   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
 #                                                  +#+#+#+#+#+   +#+          #
 #   Created: 2026/06/16 15:50:25 by gquaresm            #+#    #+#            #
-#   Updated: 2026/07/21 12:09:46 by gquaresm           ###   ########.fr      #
+#   Updated: 2026/07/23 09:13:06 by gquaresm           ###   ########.fr      #
 #                                                                             #
 # ########################################################################### #
 
+import json
 import sys
 import importlib
 from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from src.llm_sdk_calling_function import Model_with_Calling_Function
+from src.schemas import FunctionDefinition, PromptInput
 
 
 def print_execution_help() -> None:
@@ -63,7 +66,6 @@ def check_dependencies() -> None:
     REQUIRED = [
         ("numpy", "Numerical computation"),
         ("pydantic", "Data validation"),
-        ("json", "JSON serialization"),
         ("llm_sdk", "LLM inference wrapper"),
     ]
     check_available: dict[str, tuple[bool, str]] = {}
@@ -142,12 +144,50 @@ def create_argument_parser() -> ArgumentParser:
 
 
 def main() -> int:
-    check_dependencies()
-    args = create_argument_parser().parse_args()
+    args = create_argument_parser().parse_args()   # primeira linha sempre
+    check_dependencies()    # segunda linha antes da execução do PIPELINE
     print(args.functions_definition)
     print(args.input)
     print(args.output)
     print(args.model)
+
+    function_schemas = []
+    prompts_input = []
+
+    try:
+        with open(args.functions_definition) as f:
+            function_schemas = [
+                FunctionDefinition.model_validate(item)
+                for item in json.load(f)
+            ]
+            # function_schemas = json.load(f)
+        with open(args.input) as f:
+            prompts_input = [
+                PromptInput.model_validate(item)
+                for item in json.load(f)
+            ]
+            # prompts_input = json.load(f)
+    except Exception as err:
+        print("call_me_maybe: error reading the files")
+        if isinstance(err, TypeError):
+            print("call_me_maybe: Invalid schema, "
+                  "must be JSON-compatible\n", err)
+            print("call_me_maybe: TypeError\n\n", err)
+        sys.exit(1)
+
+    llm = Model_with_Calling_Function(args.model)
+
+    llm.bind_functions(function_schemas)
+
+    json_responses = []
+    for json_prompt in prompts_input:
+        json_responses.append(llm.invoke_calling_function(json_prompt.prompt))
+        # definir tipo de retorno () geração em json, conversão para esquema
+        # entrega em esquema
+        # conversão para json para escrita no arquivo após
+    
+    
+
     # Small_LLM_Model = import_or_exit()
     # model: Small_LLM_Model = Small_LLM_Model()
     # print(model)

@@ -6,15 +6,21 @@
 #   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
 #                                                  +#+#+#+#+#+   +#+          #
 #   Created: 2026/07/20 22:35:54 by gquaresm            #+#    #+#            #
-#   Updated: 2026/07/21 11:55:23 by gquaresm           ###   ########.fr      #
+#   Updated: 2026/07/23 09:12:54 by gquaresm           ###   ########.fr      #
 #                                                                             #
 # ########################################################################### #
 
-from llm_sdk import Small_LLM_Model, torch
+from typing import Any
+from pydantic import validate_call
+
+from llm_sdk import Small_LLM_Model, torch    # type: ignore[attr-defined]
+
+from src.schemas import FunctionDefinition
 
 
 class Model_with_Calling_Function(Small_LLM_Model):
 
+    @validate_call
     def __init__(
         self,
         model_name: str = "Qwen/Qwen3-0.6B",
@@ -33,14 +39,26 @@ class Model_with_Calling_Function(Small_LLM_Model):
             )
         self.token_selector = token_selector
         self.token_restrictor = token_restrictor
+        self.function_schemas: list = []
 
+    @validate_call
+    def bind_functions(
+        self,
+        function_schemas: list[FunctionDefinition]
+    ) -> None:
+        """."""
+        # raise Exception("call_me_maybe: Invalid schema, "
+        #                     "must be JSON-compatible\n", err)
+        self.function_schemas.append(function_schemas)
 
-    # bind_functions(
-    #     self,
-    #     functions: list[dict], QUAL O TIPO DOS SCHEMAS RECEBIDOS? dependeicas de JSON usar
-    # ) -> None: ?
-        # se for um iteravel de schemas (validar tipo) ou lançar problema.
-        # self.functions = functions
+    @validate_call
+    def invoke_calling_function(
+        self,
+        prompt: str
+    ) -> Any:
+        """."""
+        print("calling function: ", prompt)
+        return ""
 
 
 #         from langchain_core.tools import tool
@@ -49,7 +67,8 @@ class Model_with_Calling_Function(Small_LLM_Model):
 # # 1. Define the function using the @tool decorator
 # @tool
 # def multiply_numbers(a: int, b: int) -> int:
-#     """Multiply two integers together. Use this tool whenever math multiplication is required."""
+#     """Multiply two integers together. Use this tool whenever math
+#  multiplication is required."""
 #     return a * b
 
 # # 2. Initialize your LLM model
@@ -70,11 +89,10 @@ class Model_with_Calling_Function(Small_LLM_Model):
 # if ai_message.tool_calls:
 #     tool_call = ai_message.tool_calls[0]
 #     arguments = tool_call["args"] # Extract arguments dictionary
-    
+
 #     # Run the native function
 #     result = multiply_numbers.invoke(arguments)
 #     print(f"\nExecution Result: {result}")
-
 
     # método para registrar calling functions
 
@@ -90,24 +108,28 @@ class Model_with_Calling_Function(Small_LLM_Model):
 
     #
 
-    pass
+    # pass
 
-    # método para pegar os logits dos valores restritos de tipo (BOOLEAN, NUMBER (int e float), STRING, ETC)
-    # para cada modelo > tokenizer.encode("true") > obtém os IDs > guarda internamente
+    # método para pegar os logits dos valores restritos de tipo
+    #  (BOOLEAN, NUMBER (int e float), STRING, ETC)
+    # para cada modelo > tokenizer.encode("true") > obtém os IDs > guarda
+    #  internamente
 
     # ppara verificar se não for igual, verifica se o estado atual inclui
 
-    # como saber quais tokens são validos: restrição em json qual algoritmo ou qual mescla de algoritmos para que seja possível mais de um modelo (por causa do tokenizador)
-
+    # como saber quais tokens são validos: restrição em json qual algoritmo
+    # ou qual mescla de algoritmos para que seja possível mais de um modelo
+    # (por causa do tokenizador)
 
     # conversor de SCHEMA
 
-    # parser que entende o schema e converte em validações iterativas recebendo o modelo
+    # parser que entende o schema e converte em validações iterativas
+    # recebendo o modelo
 
     # método de gerar resposta comum (método) invoke
-    # método 
+    # método
 
-    # suporte a estrategias de 
+    # suporte a estrategias de
 
 #     customizar a nível de ter o padrão Strategy e por opções como:
 

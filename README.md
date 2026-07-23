@@ -1,27 +1,36 @@
 _This project has been created as part of the 42 curriculum by gquaresm._
 
 TO-DO
+- começar a implementação da restrição de geração e etc (buscando desacoplamento com strategies)
 
+DONE
 - terminar leitura do subject
-
 - criar o makefile
-
 - incluir o SDK
 - rodar e testar o modelo no meu notebook (conferir viabilidade do projeto ser feito em casa)
-
 - estudar os usos do SDK
 - planejar o fluxo das interações
 - arquitetar para cumprir os requisitos do bônus e disponibilizar a biblioteca (testar com outros modelos além do qwen? como?)
+- extender classe com calling functions
+
+- leitura e validação dos arquivos jsons
+- definir esquema para o output (terminar main)
 
 
-
-
-extender classe com calling functions
 
 métodos como
 -> invoke e etc
 -> invoke calling function?
 Tipar resposta normal e tipar resposta calling function
+
+invoke  ->  uma chamada simples e bloqueante
+stream  ->  um gerador é uma transmissão de dados das apis (bonus eu acho)
+batch   ->  processamento em paralelo (bonus eu acho)
+
+chain -> avançado do langchain para manipulação de correntes de prompts, conversas etc não vou fazer
+
+
+// Cache de Prompt, Cache de Chave-Valor (KV) e Cache Semântico
 
 
 não quero fazer um tokenizador proproi vai daR MUITO TRABALHO
@@ -43,21 +52,6 @@ Neste projeto, a decodificação com restrições deve não apenas garantir um J
 Pense em como você pode usar o arquivo JSON de vocabulário para mapear a relação entre
 tokens e suas representações em string. Isso é fundamental para
 determinar quais tokens são válidos em cada etapa da geração.
-
-
-[10:09, 6/21/2026] quaresma: extender classe com calling functions
-
-métodos como
-
--> invoke e etc
--> invoke calling function?
-[10:10, 6/21/2026] quaresma: Tipar resposta normal e tipar resposta calling function
-
-
-
-
-
-
 
 
 Check for bonus features (optional, not required for passing):
@@ -102,7 +96,7 @@ uv run python -m src
 Pré-requisitos
 
 - uv
-- ram
+<!-- - ram -->
 
 Instalação do uv:
 
