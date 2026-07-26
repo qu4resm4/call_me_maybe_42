@@ -3,6 +3,11 @@ _This project has been created as part of the 42 curriculum by gquaresm._
 TO-DO
 - começar a implementação da restrição de geração e etc (buscando desacoplamento com strategies)
 
+- entender como  Templates for Chat Models vão ajudar nos modelos.
+
+ChatML templat
+
+
 DONE
 - terminar leitura do subject
 - criar o makefile
@@ -96,8 +101,37 @@ uv run python -m src
 Pré-requisitos
 
 - uv
-<!-- - ram -->
 
 Instalação do uv:
 
 curl -LsSf https://astral.sh/uv/install.sh | sh
+
+
+
+tecnicas de tags para LLMs
+
+
+
+ https://huggingface.co/docs/transformers/v4.43.2/en/chat_templating?utm_source=chatgpt.com
+
+
+ ---
+
+TESTE DE FILHO DA PUTA
+
+<|system|>
+You are a friendly chatbot who always responds in the style of a pirate</s> 
+<|user|>
+How many helicopters can a human eat in one sitting?</s> 
+<|assistant|>
+
+
+
+---
+
+<|im_start|> e <|im_end|>, que estruturam as mensagens combinados com três papéis principais: system, user e assistant
+
+<think>...</think> blocks
+
+
+tool (ou function): Usado em algumas variações modernas para chamadas e retornos de ferramentas externas

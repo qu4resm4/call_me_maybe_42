@@ -12,6 +12,7 @@
 
 from typing import Any
 from pydantic import ConfigDict, validate_call
+import os
 
 from llm_sdk import Small_LLM_Model, torch    # type: ignore[attr-defined]
 
@@ -90,7 +91,7 @@ class Model_with_Calling_Function(Small_LLM_Model):
         # if len(generated) >= max_tokens:
         #     break
 
-    # @validate_call
+    @validate_call
     def invoke(
         self,
         prompt: str
@@ -108,7 +109,11 @@ class Model_with_Calling_Function(Small_LLM_Model):
             # Obtém a distribuição para o próximo token
             logits = self.get_logits_from_input_ids(context)
 
-            print("contexto: ", context)
+            print(type(logits))
+            print(logits[0])   # se for numpy/torch
+
+            #os.system('cls' if os.name == 'nt' else 'clear')
+            print("contexto: ", self.decode(context))
             # Escolhe um token (Greedy, por enquanto)
             # next_token = max(logits)   # argmax(logits)
             next_token_id: int = 0

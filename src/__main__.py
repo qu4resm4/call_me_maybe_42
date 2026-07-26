@@ -204,8 +204,11 @@ def testes() -> None:
     print(args.output)
     print(args.model)
     llm = Model_with_Calling_Function(args.model)
-    print(llm.tradutor())
-    # print(llm.invoke("No céu tem pão?"))
+    print(llm.invoke("""<|system|>
+You are a friendly chatbot who always responds in the style of a pirate</s> 
+<|user|>
+How many helicopters can a human eat in one sitting?</s> 
+<|assistant|>"""))
 
 
 if __name__ == "__main__":
