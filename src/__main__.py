@@ -6,7 +6,7 @@
 #   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
 #                                                  +#+#+#+#+#+   +#+          #
 #   Created: 2026/06/16 15:50:25 by gquaresm            #+#    #+#            #
-#   Updated: 2026/07/23 09:13:06 by gquaresm           ###   ########.fr      #
+#   Updated: 2026/07/25 23:16:02 by gquaresm           ###   ########.fr      #
 #                                                                             #
 # ########################################################################### #
 
@@ -185,8 +185,6 @@ def main() -> int:
         # definir tipo de retorno () geração em json, conversão para esquema
         # entrega em esquema
         # conversão para json para escrita no arquivo após
-    
-    
 
     # Small_LLM_Model = import_or_exit()
     # model: Small_LLM_Model = Small_LLM_Model()
@@ -199,6 +197,18 @@ def main() -> int:
     return 0
 
 
+def testes() -> None:
+    args = create_argument_parser().parse_args()   # primeira linha sempre
+    print(args.functions_definition)
+    print(args.input)
+    print(args.output)
+    print(args.model)
+    llm = Model_with_Calling_Function(args.model)
+    print(llm.tradutor())
+    # print(llm.invoke("No céu tem pão?"))
+
+
 if __name__ == "__main__":
-    main()
+    testes()
+    # main()
     # raise SystemExit(main())

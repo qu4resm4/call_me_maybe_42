@@ -6,12 +6,12 @@
 #   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
 #                                                  +#+#+#+#+#+   +#+          #
 #   Created: 2026/07/20 22:35:54 by gquaresm            #+#    #+#            #
-#   Updated: 2026/07/23 09:12:54 by gquaresm           ###   ########.fr      #
+#   Updated: 2026/07/25 23:17:11 by gquaresm           ###   ########.fr      #
 #                                                                             #
 # ########################################################################### #
 
 from typing import Any
-from pydantic import validate_call
+from pydantic import ConfigDict, validate_call
 
 from llm_sdk import Small_LLM_Model, torch    # type: ignore[attr-defined]
 
@@ -20,7 +20,7 @@ from src.schemas import FunctionDefinition
 
 class Model_with_Calling_Function(Small_LLM_Model):
 
-    @validate_call
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def __init__(
         self,
         model_name: str = "Qwen/Qwen3-0.6B",
@@ -49,6 +49,7 @@ class Model_with_Calling_Function(Small_LLM_Model):
         """."""
         # raise Exception("call_me_maybe: Invalid schema, "
         #                     "must be JSON-compatible\n", err)
+        # verificar se não está vazia 
         self.function_schemas.append(function_schemas)
 
     @validate_call
@@ -57,8 +58,79 @@ class Model_with_Calling_Function(Small_LLM_Model):
         prompt: str
     ) -> Any:
         """."""
+        # verificar se não está vazio
+        if len(self.function_schemas) == 0:
+            msg = ("call_me_maybe: "
+                   "It is necessary to associate function schemas.\n")
+            raise Exception(msg)
         print("calling function: ", prompt)
         return ""
+
+        # while not stop_condition:
+
+        # logits = backend.get_logits_from_input_ids(input_ids)
+
+        # logits = token_restrictor.restrict(
+        #     logits,
+        #     generation_state
+        # )
+
+        # next_token = token_selector.select(logits)
+
+        # input_ids.append(next_token)
+
+        # generation_state.update(next_token)
+
+        # if next_token == eos_token:
+        #     break
+
+        # if generation_state.is_finished():
+        #     break
+
+        # if len(generated) >= max_tokens:
+        #     break
+
+    # @validate_call
+    def invoke(
+        self,
+        prompt: str
+    ) -> str:
+        """."""
+        # Tokeniza o prompt
+        input_ids = self.encode(prompt)
+
+        context: list[int] = input_ids.tolist()[0]
+
+        print("primeiro contexto: ", context)
+        print("tipo contexto: ", type(context))
+
+        while True:
+            # Obtém a distribuição para o próximo token
+            logits = self.get_logits_from_input_ids(context)
+
+            print("contexto: ", context)
+            # Escolhe um token (Greedy, por enquanto)
+            # next_token = max(logits)   # argmax(logits)
+            next_token_id: int = 0
+            max_logit = logits[0]
+            for token_id, logit in enumerate(logits):
+                if max_logit < logit:
+                    max_logit = logit
+                    next_token_id = token_id
+
+            # Acrescenta o token ao contexto
+            context.append(next_token_id)
+
+            # Verifica se terminou
+            if next_token_id == self._tokenizer.eos_token_id:
+                break
+
+        return self.decode(context)
+
+    def tradutor(self) -> str:
+        context = [2753, 63834, 84, 1562, 281, 3413, 30, 362, 74506, 3958, 1643, 11, 9243, 297, 1709, 3958, 297, 281, 3413, 30, 506, 281, 3413, 3958, 4443, 452, 15027, 1709, 3958, 1152, 6357, 469,281, 3413, 11, 9243, 297, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30,506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506,63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30]
+        return self.decode(context)
+            
 
 
 #         from langchain_core.tools import tool
