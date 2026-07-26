@@ -67,29 +67,34 @@ class Model_with_Calling_Function(Small_LLM_Model):
         print("calling function: ", prompt)
         return ""
 
-        # while not stop_condition:
+    #@validate_call
+    #def invoke_calling_function(
+    #    self,
+    #    prompt: str
+    #) -> Any:
+    #     while not stop_condition:
 
-        # logits = backend.get_logits_from_input_ids(input_ids)
+    #     logits = backend.get_logits_from_input_ids(input_ids)
 
-        # logits = token_restrictor.restrict(
-        #     logits,
-        #     generation_state
-        # )
+    #     logits = token_restrictor.restrict(
+    #         logits,
+    #         generation_state
+    #     )
 
-        # next_token = token_selector.select(logits)
+    #     next_token = token_selector.select(logits)
 
-        # input_ids.append(next_token)
+    #     input_ids.append(next_token)
 
-        # generation_state.update(next_token)
+    #     generation_state.update(next_token)
 
-        # if next_token == eos_token:
-        #     break
+    #     if next_token == eos_token:
+    #         break
 
-        # if generation_state.is_finished():
-        #     break
+    #     if generation_state.is_finished():
+    #         break
 
-        # if len(generated) >= max_tokens:
-        #     break
+    #     if len(generated) >= max_tokens:
+    #         break
 
     @validate_call
     def invoke(
@@ -218,3 +223,15 @@ class Model_with_Calling_Function(Small_LLM_Model):
 # DFA
 # Trie
 # Grammar
+
+
+
+# classe para gerenciar estados da geração?
+# generation_state.update? 
+# teria que ter acesso ao model e etc que tem no small_llm
+
+# ESTADOS SINTÁTICOS  ->  para garantir a sintaxe do json
+# ESTADOS SEMANTICOS ->   para gerar o que tem a ver no 
+# sentido e validar tipos  esperado = integer
+#
+

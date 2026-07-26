@@ -135,3 +135,10 @@ How many helicopters can a human eat in one sitting?</s>
 
 
 tool (ou function): Usado em algumas variações modernas para chamadas e retornos de ferramentas externas
+
+Constrained Decoding
+
+
+---
+
+float('-inf'): A forma mais comum, que não exige nenhuma importação.-math.inf: Usando o módulo nativo math (necessita de import math).-np.inf: Usando a biblioteca NumPy, caso trabalhe com análise de 
