@@ -138,7 +138,34 @@ tool (ou function): Usado em algumas variações modernas para chamadas e retorn
 
 Constrained Decoding
 
+--- MODELO DE INFERENCIA
+
+LLM inference is the process of running a pre-trained large language model to generate output tokens for new input prompts, without updating the models learned parameters. During inference, the model processes the input through its transformer layers to predict the probability of possible next tokens. Then, the model generates the response one token at a time while using previously generated tokens as context.
+
+https://www.ibm.com/think/topics/llm-inference
+
+# switch to inference-only mode
+for p in self._model.parameters():
+    p.requires_grad = False
+
+
+O que são modelos autorregressivos?
+Os modelos autorregressivos são uma classe de modelos de aprendizado de máquina (ML) que predizem automaticamente o próximo componente em uma sequência fazendo medições de entradas anteriores na sequência. A autorregressão é uma técnica estatística usada na análise de séries temporais que pressupõe que o valor atual de uma série temporal é uma função de seus valores passados. Modelos autorregressivos usam técnicas matemáticas semelhantes para determinar a correlação probabilística entre elementos em uma sequência. Eles então usam o conhecimento derivado para adivinhar o próximo elemento em uma sequência desconhecida. Por exemplo, durante o treinamento, um modelo autorregressivo processa várias frases em inglês e identifica que a palavra “is” sempre segue a palavra “there”. Em seguida, ele gera uma nova sequência que tem “there is” junto.
+
+https://aws.amazon.com/pt/what-is/autoregressive-models/
+
 
 ---
 
 float('-inf'): A forma mais comum, que não exige nenhuma importação.-math.inf: Usando o módulo nativo math (necessita de import math).-np.inf: Usando a biblioteca NumPy, caso trabalhe com análise de 
+
+
+
+Um pad token (token de preenchimento) é um marcador especial usado para igualar o tamanho de diferentes sequências de texto em um lote (batch). As redes neurais processam matrizes e precisam que todas as frases tenham exatamente a mesma quantidade de números/tokens
+
+igualar tamanho 
+
+
+calculo de atenção
+
+O cálculo de atenção é uma ferramenta matemática usada em inteligência artificial para ajudar modelos de linguagem a entenderem o contexto de palavras em uma frase. Ele usa três vetores principais chamados de Consulta (Query), Chave (Key) e Valor (Value).

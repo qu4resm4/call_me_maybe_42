@@ -6,7 +6,7 @@
 #   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
 #                                                  +#+#+#+#+#+   +#+          #
 #   Created: 2026/07/20 22:35:54 by gquaresm            #+#    #+#            #
-#   Updated: 2026/07/25 23:17:11 by gquaresm           ###   ########.fr      #
+#   Updated: 2026/07/26 18:43:23 by gquaresm           ###   ########.fr      #
 #                                                                             #
 # ########################################################################### #
 
@@ -109,6 +109,8 @@ class Model_with_Calling_Function(Small_LLM_Model):
 
         print("primeiro contexto: ", context)
         print("tipo contexto: ", type(context))
+
+        self._tokenizer.appl
 
         while True:
             # Obtém a distribuição para o próximo token
