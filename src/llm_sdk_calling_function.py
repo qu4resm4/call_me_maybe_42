@@ -6,17 +6,17 @@
 #   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
 #                                                  +#+#+#+#+#+   +#+          #
 #   Created: 2026/07/20 22:35:54 by gquaresm            #+#    #+#            #
-#   Updated: 2026/07/26 18:43:23 by gquaresm           ###   ########.fr      #
+#   Updated: 2026/07/28 11:42:27 by gquaresm           ###   ########.fr      #
 #                                                                             #
 # ########################################################################### #
 
-from typing import Any
+from typing import Any, cast
+
 from pydantic import ConfigDict, validate_call
-import os
 
 from llm_sdk import Small_LLM_Model, torch    # type: ignore[attr-defined]
 
-from src.schemas import FunctionDefinition
+from src.schemas import ChatMLRole, ChatMLTemplate, FunctionDefinition
 
 
 class Model_with_Calling_Function(Small_LLM_Model):
@@ -40,7 +40,8 @@ class Model_with_Calling_Function(Small_LLM_Model):
             )
         self.token_selector = token_selector
         self.token_restrictor = token_restrictor
-        self.function_schemas: list = []
+        self.function_schemas: list[dict] = []
+        self._max_tokens: int = 20000    # vinte mil
 
     @validate_call
     def bind_functions(
@@ -48,79 +49,196 @@ class Model_with_Calling_Function(Small_LLM_Model):
         function_schemas: list[FunctionDefinition]
     ) -> None:
         """."""
-        # raise Exception("call_me_maybe: Invalid schema, "
-        #                     "must be JSON-compatible\n", err)
-        # verificar se não está vazia 
-        self.function_schemas.append(function_schemas)
+        self.function_schemas.append(*[
+            func.model_dump(exclude_none=True) for func in function_schemas
+        ])
 
     @validate_call
-    def invoke_calling_function(
-        self,
-        prompt: str
-    ) -> Any:
+    def format_prompt(self, messages: list[ChatMLTemplate]) -> str:
         """."""
-        # verificar se não está vazio
+        formatted_messages = [
+            msg.model_dump(exclude_none=True) for msg in messages
+        ]
+        return_value = self._tokenizer.apply_chat_template(
+            formatted_messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+        if isinstance(return_value, str):
+            return return_value
+        return ""
+
+    @validate_call
+    def format_prompt_to_calling_function(
+        self,
+        messages: list[ChatMLTemplate]
+    ) -> str:
+        """."""
         if len(self.function_schemas) == 0:
             msg = ("call_me_maybe: "
                    "It is necessary to associate function schemas.\n")
             raise Exception(msg)
-        print("calling function: ", prompt)
+        # Converter os modelos Pydantic de volta para dicts para o transformers
+        formatted_messages = [
+            msg.model_dump(exclude_none=True) for msg in messages
+        ]
+        return_value = self._tokenizer.apply_chat_template(
+            formatted_messages,
+            tools=[*self.function_schemas],
+            tokenize=False,
+            add_generation_prompt=True
+        )
+        if isinstance(return_value, str):
+            return return_value
         return ""
 
-    #@validate_call
-    #def invoke_calling_function(
+    @validate_call
+    def parse_response(
+        self,
+        response: str
+    ) -> list[dict[str, str]]:
+        """ reverso do apply_chat_template que usa os otkens especificos
+         do modelo que delimita cada coisa"""
+        schema = ChatMLTemplate.model_json_schema()
+        r_value = self._tokenizer.parse_response(response, schema)
+        # Normalize returned value to list[dict[str, str]] for Pylance e Mypy
+        print("r_value fdp:", r_value)
+        if (
+            isinstance(r_value, list)
+            and len(r_value) > 0
+            and isinstance(r_value[0], dict)
+        ):
+            normalized: list[dict[str, str]] = []
+            for item in r_value:
+                if not isinstance(item, dict):
+                    continue
+                normalized.append({str(k): str(v) for k, v in item.items()})
+            return normalized
+        return []
+
+
+# import re
+# from transformers import AutoTokenizer
+
+# def parse_response_dynamically(response_text: str, tokenizer: AutoTokenizer) -> list[dict]:
+#     """
+#     Tenta decodificar o texto de qualquer LLM lendo seus atributos de chat e tokens nativos.
+#     """
+#     # 1. Tenta usar o recurso nativo de parsing do transformers (se o modelo já suportar)
+#     if getattr(tokenizer, "response_schema", None) is not None:
+#         try:
+#             return tokenizer.parse_response(response_text)
+#         except Exception:
+#             pass
+
+#     # 2. Descobre tokens especiais diretamente do tokenizer do modelo
+#     special_tokens = list(tokenizer.all_special_tokens)
+    
+#     # 3. Detecta os marcadores de role inspecionando o Jinja Chat Template
+#     chat_template = getattr(tokenizer, "chat_template", "") or ""
+    
+#     # Padrão ChatML (<|im_start|>, <|im_end|>)
+#     if "<|im_start|>" in chat_template or "<|im_start|>" in special_tokens:
+#         pattern = r"<\|im_start\|>(\w+)\n?(.*?)(?=<\|im_end\|>|$)"
+#         matches = re.findall(pattern, response_text, re.DOTALL)
+#         if matches:
+#             return [{"role": role.strip(), "content": content.strip()} for role, content in matches]
+
+#     # Padrão Llama 3 / Qwen 2.5 (<|start_header_id|> user <|end_header_id|>)
+#     if "<|start_header_id|>" in chat_template or "<|start_header_id|>" in special_tokens:
+#         pattern = r"<\|start_header_id\|>(\w+)<\|end_header_id\|>\n\n(.*?)(?=<\|eot_id\|>|<|start_header_id\|>|$)"
+#         matches = re.findall(pattern, response_text, re.DOTALL)
+#         if matches:
+#             return [{"role": role.strip(), "content": content.strip()} for role, content in matches]
+
+#     # Padrão Mistral / Llama 2 ([INST] ... [/INST])
+#     if "[INST]" in chat_template or "[INST]" in special_tokens:
+#         # Mistral não marca claramente a resposta do assistente com tags específicas,
+#         # ela fica apenas fora do [INST]
+#         clean_text = re.sub(r"\[INST\].*?\[/INST\]", "", response_text, flags=re.DOTALL).strip()
+#         # Remove EOS tokens do modelo
+#         for eos in [tokenizer.eos_token, "</s>"]:
+#             if eos:
+#                 clean_text = clean_text.replace(eos, "").strip()
+#         return [{"role": "assistant", "content": clean_text}]
+
+#     # Fallback genérico: Limpa tokens de fim de texto (EOS/PAD) e assume que é a resposta do assistente
+#     clean_text = response_text
+#     for token in tokenizer.all_special_tokens:
+#         clean_text = clean_text.replace(token, "")
+    
+#     return [{"role": "assistant", "content": clean_text.strip()}]
+
+
+    # @validate_call
+    # def invoke_calling_function(
     #    self,
     #    prompt: str
-    #) -> Any:
+    # ) -> Any:
+    #     """;"""
+    #     if len(self.function_schemas) == 0:
+    #         msg = ("call_me_maybe: "
+    #                "It is necessary to associate function schemas.\n")
+    #         raise Exception(msg)
+
+    #     input_ids = self.encode(prompt)
+        
+    #     context: list[int] = input_ids.tolist()[0]
+        
+    #     print("primeiro contexto: ", context)
+    #     print("tipo contexto: ", type(context))
+
+    #     stop_condition = False
     #     while not stop_condition:
-
-    #     logits = backend.get_logits_from_input_ids(input_ids)
-
-    #     logits = token_restrictor.restrict(
-    #         logits,
-    #         generation_state
-    #     )
-
-    #     next_token = token_selector.select(logits)
-
-    #     input_ids.append(next_token)
-
-    #     generation_state.update(next_token)
-
-    #     if next_token == eos_token:
-    #         break
-
-    #     if generation_state.is_finished():
-    #         break
-
-    #     if len(generated) >= max_tokens:
-    #         break
+    #         logits = self.get_logits_from_input_ids(input_ids)
+    #         logits = token_restrictor.restrict(
+    #             logits,
+    #             generation_state
+    #         )
+    #         next_token = token_selector.select(logits)
+    #         input_ids.append(next_token)
+    #         generation_state.update(next_token)
+    #         if next_token == eos_token:
+    #             break
+    #         if generation_state.is_finished():
+    #             break
+    #         if len(generated) >= self._max_tokens:
+    #             break
+            
+    #     token_str = self.decode(context)
+    #     response = self.parse_response(token_str)
+    #     # pegar a última mensagem de assistant?
+    #     return response
 
     @validate_call
     def invoke(
         self,
-        prompt: str
+        prompt: str | list[ChatMLTemplate]
     ) -> str:
         """."""
         # Tokeniza o prompt
-        input_ids = self.encode(prompt)
+        import os
+
+        if isinstance(prompt, str):
+            prompt = [
+                ChatMLTemplate(
+                    role=ChatMLRole.USER.value,
+                    content=prompt
+                )
+            ]
+        formatted_prompt = self.format_prompt(prompt)
+
+        input_ids = self.encode(formatted_prompt)
 
         context: list[int] = input_ids.tolist()[0]
-
-        print("primeiro contexto: ", context)
-        print("tipo contexto: ", type(context))
-
-        self._tokenizer.appl
 
         while True:
             # Obtém a distribuição para o próximo token
             logits = self.get_logits_from_input_ids(context)
 
-            print(type(logits))
-            print(logits[0])   # se for numpy/torch
+            os.system('cls' if os.name == 'nt' else 'clear')
+            print("contexto atual: ", self.decode(context))
 
-            #os.system('cls' if os.name == 'nt' else 'clear')
-            print("contexto: ", self.decode(context))
             # Escolhe um token (Greedy, por enquanto)
             # next_token = max(logits)   # argmax(logits)
             next_token_id: int = 0
@@ -137,13 +255,11 @@ class Model_with_Calling_Function(Small_LLM_Model):
             if next_token_id == self._tokenizer.eos_token_id:
                 break
 
-        return self.decode(context)
-
-    def tradutor(self) -> str:
-        context = [2753, 63834, 84, 1562, 281, 3413, 30, 362, 74506, 3958, 1643, 11, 9243, 297, 1709, 3958, 297, 281, 3413, 30, 506, 281, 3413, 3958, 4443, 452, 15027, 1709, 3958, 1152, 6357, 469,281, 3413, 11, 9243, 297, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30,506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506,63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30, 506, 63834, 84, 1562, 281, 3413, 30]
-        return self.decode(context)
-            
-
+        token_str = self.decode(context)
+        response = self.parse_response(token_str)
+        # pegar a última mensagem de assistant?
+        print("printando response", response)
+        return ""
 
 #         from langchain_core.tools import tool
 # from langchain_openai import ChatOpenAI

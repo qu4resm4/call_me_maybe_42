@@ -169,3 +169,38 @@ igualar tamanho
 calculo de atenção
 
 O cálculo de atenção é uma ferramenta matemática usada em inteligência artificial para ajudar modelos de linguagem a entenderem o contexto de palavras em uma frase. Ele usa três vetores principais chamados de Consulta (Query), Chave (Key) e Valor (Value).
+
+
+                    Function Schemas
+                           │
+                           ▼
+                 Constraint Compiler
+             (Schema → DFA/Grammar)
+                           │
+                           ▼
+                  GenerationState
+                           │
+                           ▼
+                  TokenRestrictor
+                           │
+                 logits mascarados
+                           │
+                           ▼
+                  TokenSelector
+                           │
+                           ▼
+                     next_token_id
+
+
+                     ---
+
+contexto atual:  user
+Se meu nome é Gabriel Quaresma, qual seria meu nome primeiro nome?
+assistant
+<think>
+Okay, the user is asking for Gabriel Quaresma's first name. Let me start by recalling that Gabriel is the last name. The first name would be the initial part of the surname. So, Gabriel is the last name, and the first part is G. Therefore, the first name should be Gabriel. I should confirm that there's no confusion with other names or that the user might have a different intended name. Also, make sure to present the answer clearly and concisely.
+</think>
+
+Seu primeiro nome é **Gabriel**.
+r_value fdp: {'role': "user\nSe meu nome é Gabriel Quaresma, qual seria meu nome primeiro nome?\nassistant\n<think>\nOkay, the user is asking for Gabriel Quaresma's first name. Let me start by recalling that Gabriel is the last name. The first name would be the initial part of the surname. So, Gabriel is the last name, and the first part is G. Therefore, the first name should be Gabriel. I should confirm that there's no confusion with other names or that the user might have a different intended name. Also, make sure to present the answer clearly and concisely.\n</think>\n\nSeu primeiro nome é **Gabriel**.", 'content': "user\nSe meu nome é Gabriel Quaresma, qual seria meu nome primeiro nome?\nassistant\n<think>\nOkay, the user is asking for Gabriel Quaresma's first name. Let me start by recalling that Gabriel is the last name. The first name would be the initial part of the surname. So, Gabriel is the last name, and the first part is G. Therefore, the first name should be Gabriel. I should confirm that there's no confusion with other names or that the user might have a different intended name. Also, make sure to present the answer clearly and concisely.\n</think>\n\nSeu primeiro nome é **Gabriel**."}
+printando response []

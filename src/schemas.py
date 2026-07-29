@@ -6,12 +6,13 @@
 #   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
 #                                                  +#+#+#+#+#+   +#+          #
 #   Created: 2026/07/22 22:15:08 by gquaresm            #+#    #+#            #
-#   Updated: 2026/07/25 20:44:41 by gquaresm           ###   ########.fr      #
+#   Updated: 2026/07/28 10:26:12 by gquaresm           ###   ########.fr      #
 #                                                                             #
 # ########################################################################### #
 
 from enum import StrEnum
 from numbers import Number
+from typing import Literal, Optional
 from pydantic import BaseModel
 
 # -----------------------------------------------------------------------------
@@ -71,3 +72,15 @@ class FunctionCallingResult(BaseModel):
 # tipar resposta calling function
 # tipar schema de resposta estrutura ? vai dar trabalho não fazer
 #  isso depende de um leitor de estrutura e criação dinamica
+
+
+class ChatMLRole(StrEnum):
+    SYSTEM = "system"
+    USER = "user"
+    ASSISTANT = "assistant"
+    TOOL = "tool"
+
+
+class ChatMLTemplate(BaseModel):
+    role: Literal["system", "user", "assistant", "tool"]
+    content: Optional[str]

@@ -6,7 +6,7 @@
 #   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
 #                                                  +#+#+#+#+#+   +#+          #
 #   Created: 2026/06/16 15:50:25 by gquaresm            #+#    #+#            #
-#   Updated: 2026/07/25 23:16:02 by gquaresm           ###   ########.fr      #
+#   Updated: 2026/07/28 11:14:25 by gquaresm           ###   ########.fr      #
 #                                                                             #
 # ########################################################################### #
 
@@ -204,11 +204,57 @@ def testes() -> None:
     print(args.output)
     print(args.model)
     llm = Model_with_Calling_Function(args.model)
-    print(llm.invoke("""<|system|>
-You are a friendly chatbot who always responds in the style of a pirate</s> 
-<|user|>
-How many helicopters can a human eat in one sitting?</s> 
-<|assistant|>"""))
+
+    llm.invoke("Se meu nome é Gabriel Quaresma, qual seria meu nome primeiro nome?")
+
+    # print(llm.format_prompt([
+    #     {
+    #         "role": "system",
+    #         "content": "You are a friendly chatbot who always responds in the style of a pirate"
+    #     },
+    #     {
+    #         "role": "user",
+    #         "content": "How many helicopters can a human eat in one sitting?"
+    #     }
+    # ]))
+
+    # def get_weather(location: str) -> str:
+    #     """Gets the current weather for a location.
+        
+    #     Args:
+    #         location: City and state, e.g. San Francisco, CA
+    #     """
+    #     return "22°C"
+
+    # formatted_text = llm.format_prompt(
+    #     messages=[
+    #         {
+    #             "role": "user",
+    #             "content": "Como está o tempo no Rio de Janeiro?"
+    #         }
+    #     ],
+    #     tools=[
+    #         {
+    #             "name": "fn_greet",
+    #             "description": "Generate a greeting message for a person by name.",
+    #             "parameters": {
+    #                 "name": {"type": "string"}
+    #             },
+    #             "returns": {
+    #                 "type": "string"
+    #             }
+    #         }
+    #     ]   # Passando a função diretamente!
+    # )
+
+    # print(formatted_text)
+
+    
+#     print(llm.invoke("""<|system|>
+# You are a friendly chatbot who always responds in the style of a pirate</s> 
+# <|user|>
+# How many helicopters can a human eat in one sitting?</s> 
+# <|assistant|>"""))
 
 
 if __name__ == "__main__":
