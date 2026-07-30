@@ -272,6 +272,11 @@ def testes() -> None:
     <|im_start|>assistant
     """
 
+    # sobre a formatação, o decode é a nivel de leitura para palabras, 
+    # então faz sentido limpar os tokens especiais. seria mais fácil splitar
+    # a resposta da LLM enquanto os tokens exisitirem, só capturar o token id de cada marcação e usar para separar
+    # 
+
     # enquanto gera captar o estado 
     # "nome da função e quando for selecionado um dos valores restritos
     #  daí aplica o schema escolhido para os argumentos, conforme o estado da geração no DFA
