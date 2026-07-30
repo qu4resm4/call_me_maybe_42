@@ -88,9 +88,7 @@ class Model_with_Calling_Function(Small_LLM_Model):
             tokenize=False,
             add_generation_prompt=True
         )
-        if isinstance(return_value, str):
-            return return_value
-        return ""
+        return return_value
 
     @validate_call
     def parse_response(
@@ -103,18 +101,7 @@ class Model_with_Calling_Function(Small_LLM_Model):
         r_value = self._tokenizer.parse_response(response, schema)
         # Normalize returned value to list[dict[str, str]] for Pylance e Mypy
         print("r_value fdp:", r_value)
-        if (
-            isinstance(r_value, list)
-            and len(r_value) > 0
-            and isinstance(r_value[0], dict)
-        ):
-            normalized: list[dict[str, str]] = []
-            for item in r_value:
-                if not isinstance(item, dict):
-                    continue
-                normalized.append({str(k): str(v) for k, v in item.items()})
-            return normalized
-        return []
+        return r_value
 
 
 # import re
@@ -236,7 +223,7 @@ class Model_with_Calling_Function(Small_LLM_Model):
             # Obtém a distribuição para o próximo token
             logits = self.get_logits_from_input_ids(context)
 
-            os.system('cls' if os.name == 'nt' else 'clear')
+            #os.system('cls' if os.name == 'nt' else 'clear')
             print("contexto atual: ", self.decode(context))
 
             # Escolhe um token (Greedy, por enquanto)
@@ -256,9 +243,10 @@ class Model_with_Calling_Function(Small_LLM_Model):
                 break
 
         token_str = self.decode(context)
-        response = self.parse_response(token_str)
+        print("TESTES", token_str)
+        #response = self.parse_response(token_str)
         # pegar a última mensagem de assistant?
-        print("printando response", response)
+        #print("printando response", response)
         return ""
 
 #         from langchain_core.tools import tool

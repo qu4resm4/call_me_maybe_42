@@ -205,9 +205,12 @@ def testes() -> None:
     print(args.model)
     llm = Model_with_Calling_Function(args.model)
 
-    llm.invoke("Se meu nome é Gabriel Quaresma, qual seria meu nome primeiro nome?")
+    #print("chat template: ", llm._tokenizer.chat_template)
 
-    # print(llm.format_prompt([
+
+    #llm.invoke("Se meu nome é Gabriel Quaresma, qual seria meu nome primeiro nome?")
+
+    #print(llm.format_prompt([
     #     {
     #         "role": "system",
     #         "content": "You are a friendly chatbot who always responds in the style of a pirate"
@@ -218,43 +221,62 @@ def testes() -> None:
     #     }
     # ]))
 
-    # def get_weather(location: str) -> str:
-    #     """Gets the current weather for a location.
-        
-    #     Args:
-    #         location: City and state, e.g. San Francisco, CA
-    #     """
-    #     return "22°C"
-
-    # formatted_text = llm.format_prompt(
-    #     messages=[
-    #         {
-    #             "role": "user",
-    #             "content": "Como está o tempo no Rio de Janeiro?"
-    #         }
-    #     ],
-    #     tools=[
-    #         {
-    #             "name": "fn_greet",
-    #             "description": "Generate a greeting message for a person by name.",
-    #             "parameters": {
-    #                 "name": {"type": "string"}
-    #             },
-    #             "returns": {
-    #                 "type": "string"
-    #             }
-    #         }
-    #     ]   # Passando a função diretamente!
-    # )
-
-    # print(formatted_text)
-
+    #def get_weather(location: str) -> str:
+    #    """Gets the current weather for a location.
     
-#     print(llm.invoke("""<|system|>
-# You are a friendly chatbot who always responds in the style of a pirate</s> 
-# <|user|>
-# How many helicopters can a human eat in one sitting?</s> 
-# <|assistant|>"""))
+    #    Args:
+    #        location: City and state, e.g. San Francisco, CA
+    #    """
+    #    return "22°C"
+
+    llm.bind_functions([
+            {
+                "name": "fn_greet",
+                "description": "Generate a greeting message for a person by name.",
+                "parameters": {
+                    "name": {"type": "string"}
+                },
+                "returns": {
+                    "type": "string"
+                }
+            }
+        ])
+
+    formatted_text = llm.format_prompt_to_calling_function(
+        messages=[
+            {
+                "role": "user",
+                "content": "Como está o tempo no Rio de Janeiro?"
+            }
+        ]
+    )
+    # prompt formatado:
+
+    """
+    <|im_start|>system
+    # Tools
+
+    You may call one or more functions to assist with the user query.
+
+    You are provided with function signatures within <tools></tools> XML tags:
+    <tools>
+    {"name": "fn_greet", "description": "Generate a greeting message for a person by name.", "parameters": {"name": {"type": "string"}}, "returns": {"type": "string"}}
+    </tools>
+
+    For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
+    <tool_call>
+    {"name": <function-name>, "arguments": <args-json-object>}
+    </tool_call><|im_end|>
+    <|im_start|>user
+    Como está o tempo no Rio de Janeiro?<|im_end|>
+    <|im_start|>assistant
+    """
+
+    # enquanto gera captar o estado 
+    # "nome da função e quando for selecionado um dos valores restritos
+    #  daí aplica o schema escolhido para os argumentos, conforme o estado da geração no DFA
+
+    print(formatted_text)
 
 
 if __name__ == "__main__":
