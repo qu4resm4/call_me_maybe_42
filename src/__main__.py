@@ -6,7 +6,7 @@
 #   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
 #                                                  +#+#+#+#+#+   +#+          #
 #   Created: 2026/06/16 15:50:25 by gquaresm            #+#    #+#            #
-#   Updated: 2026/07/28 11:14:25 by gquaresm           ###   ########.fr      #
+#   Updated: 2026/07/31 10:48:07 by gquaresm           ###   ########.fr      #
 #                                                                             #
 # ########################################################################### #
 
@@ -246,12 +246,17 @@ def testes() -> None:
         messages=[
             {
                 "role": "user",
-                "content": "Como está o tempo no Rio de Janeiro?"
+                "content": "Me faça um elogio, meu nome é Gabriel Quaresma"
             }
         ]
     )
-    # prompt formatado:
 
+    print(formatted_text)
+
+    print(llm.invoke(formatted_text))
+    # llm.invoke("Se meu nome é Gabriel Quaresma, qual seria meu nome primeiro nome?")
+    
+    # prompt formatado:
     """
     <|im_start|>system
     # Tools
@@ -280,8 +285,6 @@ def testes() -> None:
     # enquanto gera captar o estado 
     # "nome da função e quando for selecionado um dos valores restritos
     #  daí aplica o schema escolhido para os argumentos, conforme o estado da geração no DFA
-
-    print(formatted_text)
 
 
 if __name__ == "__main__":

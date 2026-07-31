@@ -6,7 +6,7 @@
 #   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
 #                                                  +#+#+#+#+#+   +#+          #
 #   Created: 2026/07/20 22:35:54 by gquaresm            #+#    #+#            #
-#   Updated: 2026/07/28 11:42:27 by gquaresm           ###   ########.fr      #
+#   Updated: 2026/07/31 10:55:09 by gquaresm           ###   ########.fr      #
 #                                                                             #
 # ########################################################################### #
 
@@ -97,8 +97,9 @@ class Model_with_Calling_Function(Small_LLM_Model):
     ) -> list[dict[str, str]]:
         """ reverso do apply_chat_template que usa os otkens especificos
          do modelo que delimita cada coisa"""
-        schema = ChatMLTemplate.model_json_schema()
-        r_value = self._tokenizer.parse_response(response, schema)
+        # schema = ChatMLTemplate.model_json_schema()
+        # r_value = self._tokenizer.parse_response(response, schema)
+        r_value = self._tokenizer.parse_response(response)
         # Normalize returned value to list[dict[str, str]] for Pylance e Mypy
         print("r_value fdp:", r_value)
         return r_value
@@ -223,7 +224,7 @@ class Model_with_Calling_Function(Small_LLM_Model):
             # Obtém a distribuição para o próximo token
             logits = self.get_logits_from_input_ids(context)
 
-            #os.system('cls' if os.name == 'nt' else 'clear')
+            os.system('cls' if os.name == 'nt' else 'clear')
             print("contexto atual: ", self.decode(context))
 
             # Escolhe um token (Greedy, por enquanto)
@@ -242,12 +243,13 @@ class Model_with_Calling_Function(Small_LLM_Model):
             if next_token_id == self._tokenizer.eos_token_id:
                 break
 
-        token_str = self.decode(context)
-        print("TESTES", token_str)
-        #response = self.parse_response(token_str)
+        # token_str = self.decode(context)
+        token_str = self._tokenizer.decode(context, skip_special_tokens=False)
+        print("TESTES sem skip", token_str)
+        response = self.parse_response(token_str)
         # pegar a última mensagem de assistant?
-        #print("printando response", response)
-        return ""
+        print("printando response", response)
+        return response
 
 #         from langchain_core.tools import tool
 # from langchain_openai import ChatOpenAI
