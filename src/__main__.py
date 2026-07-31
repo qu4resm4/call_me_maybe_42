@@ -229,31 +229,61 @@ def testes() -> None:
     #    """
     #    return "22°C"
 
-    llm.bind_functions([
-            {
-                "name": "fn_greet",
-                "description": "Generate a greeting message for a person by name.",
-                "parameters": {
-                    "name": {"type": "string"}
-                },
-                "returns": {
-                    "type": "string"
-                }
-            }
-        ])
+    #llm.bind_functions([
+    #        {
+    #            "name": "fn_greet",
+    #            "description": "Generate a greeting message for a person by name.",
+    #            "parameters": {
+    #                "name": {"type": "string"}
+    #            },
+    #            "returns": {
+    #                "type": "string"
+    #            }
+    #        }
+    #    ])
 
-    formatted_text = llm.format_prompt_to_calling_function(
-        messages=[
-            {
-                "role": "user",
-                "content": "Me faça um elogio, meu nome é Gabriel Quaresma"
-            }
-        ]
-    )
+    #formatted_text = llm.format_prompt_to_calling_function(
+    #    messages=[
+    #        {
+    #            "role": "user",
+    #            "content": "Me faça um elogio, meu nome é Gabriel Quaresma"
+    #        }
+    #    ]
+    #)
 
-    print(formatted_text)
+    llm.parse_response("""
+<|im_start|>user
+<|im_start|>system
+# Tools
 
-    print(llm.invoke(formatted_text))
+You may call one or more functions to assist with the user query.
+
+You are provided with function signatures within <tools></tools> XML tags:
+<tools>
+{"name": "fn_greet", "description": "Generate a greeting message for a person by name.", "parameters": {"name": {"type": "string"}}, "returns": {"type": "string"}}
+</tools>
+
+For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
+<tool_call>
+{"name": <function-name>, "arguments": <args-json-object>}
+</tool_call><|im_end|>
+<|im_start|>user
+Me faça um elogio, meu nome é Gabriel Quaresma<|im_end|>
+<|im_start|>assistant
+<|im_end|>
+<|im_start|>assistant
+<think>
+Okay, the user wants me to make a greeting. They mentioned their name is Gabriel Quaresma. Let me check the tools available. There's a function called fn_greet that takes a name parameter. I need to call that function with the name provided. I should format the tool call correctly in JSON inside the XML tags. Make sure the arguments are in JSON format and the name is a string. Alright, that should do it.
+</think>
+
+<tool_call>
+{"name": "fn_greet", "arguments": {"name": "Gabriel Quaresma"}}
+</tool_call><|im_end|>
+""")
+
+    #print(formatted_text)
+
+    #print(llm.invoke(formatted_text))
     # llm.invoke("Se meu nome é Gabriel Quaresma, qual seria meu nome primeiro nome?")
     
     # prompt formatado:

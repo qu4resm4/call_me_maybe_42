@@ -97,9 +97,9 @@ class Model_with_Calling_Function(Small_LLM_Model):
     ) -> list[dict[str, str]]:
         """ reverso do apply_chat_template que usa os otkens especificos
          do modelo que delimita cada coisa"""
-        # schema = ChatMLTemplate.model_json_schema()
-        # r_value = self._tokenizer.parse_response(response, schema)
-        r_value = self._tokenizer.parse_response(response)
+        schema = ChatMLTemplate.model_json_schema()
+        r_value = self._tokenizer.parse_response(response, schema)
+        #r_value = self._tokenizer.parse_response(response)
         # Normalize returned value to list[dict[str, str]] for Pylance e Mypy
         print("r_value fdp:", r_value)
         return r_value
