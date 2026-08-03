@@ -6,7 +6,7 @@
 #   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
 #                                                  +#+#+#+#+#+   +#+          #
 #   Created: 2026/06/16 15:50:25 by gquaresm            #+#    #+#            #
-#   Updated: 2026/08/03 15:15:03 by gquaresm           ###   ########.fr      #
+#   Updated: 2026/08/03 19:20:09 by gquaresm           ###   ########.fr      #
 #                                                                             #
 # ########################################################################### #
 
@@ -17,7 +17,7 @@ from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from src.llm_sdk_calling_function import Model_with_Calling_Function
-from src.schemas import FunctionDefinition, PromptInput
+from src.schemas import ChatMessage, FunctionDefinition, PromptInput
 
 
 def print_execution_help() -> None:
@@ -204,124 +204,92 @@ def testes() -> None:
     print(args.output)
     print(args.model)
     llm = Model_with_Calling_Function(args.model)
-    # Supondo que 'instancia' seja o objeto que possui os seus métodos descritos
 
-    # 1. Printar o Vocab File (Normalmente um JSON com mapeamento 'token': id)
-    # try:
-    #     path_vocab = llm.get_path_to_vocab_file()
-    #     print(f"=== CONTEÚDO DO VOCABULÁRIO ({path_vocab}) ===")
-    #     with open(path_vocab, 'r', encoding='utf-8') as f:
-    #         vocab_data = json.load(f)
-        
-    #     # Como o vocabulário é gigante, printamos apenas os primeiros 20 itens para não travar o terminal
-    #     primeiros_itens = dict(list(vocab_data.items())[:20])
-    #     print(json.dumps(primeiros_itens, indent=4, ensure_ascii=False))
-    #     print(f"... e mais {len(vocab_data) - 20} tokens.\n")
-    # except Exception as e:
-    #     print(f"Não foi possível ler o vocab_file: {e}\n")
+    print(llm._tokenizer.chat_template)
 
-
-    # # 2. Printar o Merges File (Arquivo de texto com os pares de junção do BPE)
-    # try:
-    #     path_merges = llm.get_path_to_merges_file()
-    #     print(f"=== CONTEÚDO DO MERGES ({path_merges}) ===")
-    #     with open(path_merges, 'r', encoding='utf-8') as f:
-    #         # Lê as primeiras 20 linhas do arquivo de merges
-    #         linhas_merges = [next(f).strip() for _ in range(20)]
-        
-    #     for linha in linhas_merges:
-    #         print(linha)
-    #     print("...\n")
-    # except Exception as e:
-    #     print(f"Não foi possível ler o merges_file: {e}\n")
-
-
-    # # 3. Printar o Tokenizer File (O arquivo principal da biblioteca Hugging Face)
-    # try:
-    #     path_tokenizer = llm.get_path_to_tokenizer_file()
-    #     print(f"=== CONTEÚDO DO TOKENIZER FILE ({path_tokenizer}) ===")
-    #     with open(path_tokenizer, 'r', encoding='utf-8') as f:
-    #         tokenizer_data = json.load(f)
-    #         for line in f.readlines():
-    #             print(line)
-        
-    #     # O tokenizer.json possui chaves estruturais importantes como "model" e "added_tokens"
-    #     print("Chaves principais encontradas no arquivo:", list(tokenizer_data.keys()))
-        
-    #     # # Exibir especificamente a seção de added_tokens que você procura
-    #     # if "added_tokens" in tokenizer_data:
-    #     #     print("\n--- Seção 'added_tokens' dentro do tokenizer.json ---")
-    #     #     print(json.dumps(tokenizer_data["added_tokens"][:15], indent=4, ensure_ascii=False))
-    #     #     print(f"... total de {len(tokenizer_data['added_tokens'])} tokens adicionados.")
-    #     # else:
-    #     #     print("\nNenhuma chave 'added_tokens' explícita na raiz do JSON.")
-    # except Exception as e:
-    #     print(f"Não foi possível ler o tokenizer_file: {e}\n")
-
-
-    # # Exemplo de uso para listar tokens adicionados e metadados
-    # added_tokens_dict = llm._tokenizer.get_added_vocab()
-    # sorted_added_tokens = dict(sorted(added_tokens_dict.items(), key=lambda item: item[1]))
-
-    # print("--- LISTA DE ADDED TOKENS ---")
-    # print(json.dumps(sorted_added_tokens, indent=4))
-
-    # # Visualizar metadados brutos (special, lstrip, rstrip, etc.)
-    # if llm._tokenizer.is_fast:
-    #     tokenizer_json_meta = json.loads(llm._tokenizer._tokenizer.to_str())
-    #     print("\n--- ESTRUTURA DO TOKENIZER.JSON ---")
-    #     print(json.dumps(tokenizer_json_meta.get("added_tokens", [])[:5], indent=4))
-
-
-    # print(llm._tokenizer.all_special_tokens)
-
-    # print("chat template: ", llm._tokenizer.chat_template)
-    # print("chat template: ", llm._tokenizer.apply_chat_template())
-    # print("\nchat special tokens map: ", llm._tokenizer.special_tokens_map)
-
-
-    #llm.invoke("Se meu nome é Gabriel Quaresma, qual seria meu nome primeiro nome?")
-
-    #print(llm.format_prompt([
-    #     {
+    # print(llm.format_prompt([
+    #     ChatMessage.model_validate({
     #         "role": "system",
     #         "content": "You are a friendly chatbot who always responds in the style of a pirate"
-    #     },
-    #     {
+    #     }),
+    #     ChatMessage.model_validate({
     #         "role": "user",
     #         "content": "How many helicopters can a human eat in one sitting?"
-    #     }
+    #     })
     # ]))
 
-    #def get_weather(location: str) -> str:
+    # def get_weather(location: str) -> str:
     #    """Gets the current weather for a location.
-    
+
     #    Args:
     #        location: City and state, e.g. San Francisco, CA
     #    """
     #    return "22°C"
 
-    #llm.bind_functions([
-    #        {
-    #            "name": "fn_greet",
-    #            "description": "Generate a greeting message for a person by name.",
-    #            "parameters": {
-    #                "name": {"type": "string"}
-    #            },
-    #            "returns": {
-    #                "type": "string"
-    #            }
-    #        }
-    #    ])
+    llm.bind_functions([
+           {
+               "name": "get_weather",
+               "description": "Gets the current weather for a location.",
+               "parameters": {
+                   "location": {"type": "string"}
+               },
+               "returns": {
+                   "type": "string"
+               }
+           }
+       ])
 
-    #formatted_text = llm.format_prompt_to_calling_function(
-    #    messages=[
-    #        {
-    #            "role": "user",
-    #            "content": "Me faça um elogio, meu nome é Gabriel Quaresma"
-    #        }
-    #    ]
-    #)
+    formatted_text = llm.format_prompt_to_calling_function(
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a helpful assistant."
+            },
+            {
+                "role": "user",
+                "content": "What's the weather?"
+            },
+            {
+                "role": "assistant",
+                "think": "Need to call weather function.",
+                "tool_calls": [
+                    {
+                        "name": "get_weather",
+                        "arguments": {
+                            "city": "Rio de Janeiro"
+                        }
+                    }
+                ],
+                "content": None
+            }
+        ]
+    )
+    print(formatted_text)
+
+    tokens_id = llm.encode(formatted_text).tolist()[0]
+
+    messages = llm._parse_context(tokens_id)
+    
+    print("--------------- mensagens -------------------")
+    for message in messages:
+        print(message.model_dump())
+
+    #print(llm.invoke(formatted_text))
+
+    
+        # {
+        #     "role": "assistant",
+        #     "thinking": "Need to call weather function.",
+        #     "tool_calls": [
+        #         {
+        #             "name": "get_weather",
+        #             "arguments": {
+        #                 "city": "Rio de Janeiro"
+        #             }
+        #         }
+        #     ],
+        #     "content": None
+        # }
 
 #     llm.parse_response("""
 # <|im_start|>user

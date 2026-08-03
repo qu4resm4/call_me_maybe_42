@@ -40,6 +40,8 @@ endif
 FUNCTIONS_DEFINITION = data/input/functions_definition.json
 DATA_INPUT = data/input/function_calling_tests.json
 DATA_OUTPUT = data/output/function_calls.json
+MODEL = Qwen/Qwen3-0.6B
+# MODEL = HuggingFaceTB/SmolLM2-360M-Instruct
 
 .PHONY: all install run run-no-install debug clean lint lint-strict check
 
@@ -81,14 +83,14 @@ endif
 
 run: install
 	@$(CLEAR)
-	uv run python -m src --functions_definition $(FUNCTIONS_DEFINITION) --input $(DATA_INPUT) --output $(DATA_OUTPUT)
+	uv run python -m src --functions_definition $(FUNCTIONS_DEFINITION) --input $(DATA_INPUT) --output $(DATA_OUTPUT) --model $(MODEL)
 
 run-no-install: check
 	@echo Executando sem sincronizar dependências...
-	uv run --no-sync python -m src --functions_definition $(FUNCTIONS_DEFINITION) --input $(DATA_INPUT) --output $(DATA_OUTPUT)
+	uv run --no-sync python -m src --functions_definition $(FUNCTIONS_DEFINITION) --input $(DATA_INPUT) --output $(DATA_OUTPUT) --model $(MODEL)
 
 debug: install
-	uv run python -m pdb -m src --functions_definition $(FUNCTIONS_DEFINITION) --input $(DATA_INPUT) --output $(DATA_OUTPUT)
+	uv run python -m pdb -m src --functions_definition $(FUNCTIONS_DEFINITION) --input $(DATA_INPUT) --output $(DATA_OUTPUT) --model $(MODEL)
 
 clean:
 ifeq ($(PLATFORM),WINDOWS)

@@ -202,8 +202,7 @@ Okay, the user is asking for Gabriel Quaresma's first name. Let me start by reca
 </think>
 
 Seu primeiro nome é **Gabriel**.
-r_value fdp: {'role': "user\nSe meu nome é Gabriel Quaresma, qual seria meu nome primeiro nome?\nassistant\n<think>\nOkay, the user is asking for Gabriel Quaresma's first name. Let me start by recalling that Gabriel is the last name. The first name would be the initial part of the surname. So, Gabriel is the last name, and the first part is G. Therefore, the first name should be Gabriel. I should confirm that there's no confusion with other names or that the user might have a different intended name. Also, make sure to present the answer clearly and concisely.\n</think>\n\nSeu primeiro nome é **Gabriel**.", 'content': "user\nSe meu nome é Gabriel Quaresma, qual seria meu nome primeiro nome?\nassistant\n<think>\nOkay, the user is asking for Gabriel Quaresma's first name. Let me start by recalling that Gabriel is the last name. The first name would be the initial part of the surname. So, Gabriel is the last name, and the first part is G. Therefore, the first name should be Gabriel. I should confirm that there's no confusion with other names or that the user might have a different intended name. Also, make sure to present the answer clearly and concisely.\n</think>\n\nSeu primeiro nome é **Gabriel**."}
-printando response []
+
 
 
 
@@ -359,3 +358,101 @@ parser XML/JSON
         │
         ▼
 dict Python
+
+
+---
+
+# DIFERENÇA DE Chat Mark Language PARA CADA FAMILIA
+
+O termo ChatML refere-se originalmente a um padrão criado pela OpenAI para estruturar conversas usando tags explícitas de início e fim (<|im_start|> e <|im_end|>). No entanto, a comunidade de IA passou a usar o termo "Chat Template" (ou formatos estilo ChatML) para descrever a forma exata como diferentes Large Language Models (LLMs) convertem um histórico de mensagens em um bloco único de texto bruto. [1, 2] 
+Cada modelo usa tokens especiais (control tokens) e sintaxes diferentes para separar o que é comando do sistema, fala do usuário e resposta da IA. Veja abaixo como o mesmo diálogo é formatado em diferentes modelos do mercado: [3, 4] 
+------------------------------
+## O Diálogo de Exemplo (Input)
+Para todas as comparações abaixo, imagine que passamos a seguinte lista estruturada de mensagens: [5] 
+
+* 
+* System: "Você é um assistente conciso."
+* User: "Qual a cor do céu?"
+* Assistant: "O céu é azul."
+* User: "E à noite?"
+* 
+
+------------------------------
+## 1. ChatML Puro (Qwen, DeepSeek, Hermes, Dolphin)
+O formato ChatML clássico usa tags explícitas que parecem XML para delimitar o início e o fim de cada turno. Modelos modernos que usam raciocínio avançado costumam embutir uma tag <think> dentro da resposta do assistente. [1, 6] 
+
+<|im_start|>system
+Você é um assistente conciso.<|im_end|>
+<|im_start|>user
+Qual a cor do céu?<|im_end|>
+<|im_start|>assistant
+<think>O usuário perguntou a cor do céu. Devo responder brevemente.</think>O céu é azul.<|im_end|>
+<|im_start|>user
+E à noite?<|im_end|>
+<|im_start|>assistant
+
+## 2. Llama 3 & Llama 3.1 (Meta)
+A Meta abandonou os formatos antigos e criou uma estrutura baseada em tokens especiais reservados (<|begin_of_text|>, <|start_header_id|>, <|end_header_id|>, <|eot_id|>). Eles evitam que o usuário simule comandos do sistema injetando texto comum. [1] 
+
+<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+Você é um assistente conciso.<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+Qual a cor do céu?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+O céu é azul.<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+E à noite?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+## 3. Mistral & Mixtral (Formatos Instruct)
+Os modelos da Mistral AI historicamente usam marcadores rígidos baseados em colchetes [INST] e [/INST]. Um detalhe crítico: os modelos antigos da Mistral não suportavam nativamente uma mensagem de sistema separada, exigindo que ela fosse concatenada junto ao primeiro comando do usuário.
+
+<s>[INST] Você é um assistente conciso.
+
+Qual a cor do céu? [/INST] O céu é azul. </s><s>[INST] E à noite? [/INST]
+
+## 4. Gemma & Gemma 2 (Google)
+Os modelos abertos do Google utilizam tags de controle textuais diretas envoltas em sinais de menor e maior (<start_of_turn> e <end_of_turn>), seguidas pelo nome do papel (role).
+
+<start_of_turn>system
+Você é um assistente conciso.<end_of_turn>
+<start_of_turn>user
+Qual a cor do céu?<end_of_turn>
+<start_of_turn>assistant
+O céu é azul.<end_of_turn>
+<start_of_turn>user
+E à noite?<end_of_turn>
+<start_of_turn>assistant
+
+## 5. Llama 2 (Formato Antigo da Meta)
+O Llama 2 possuía um dos templates de chat mais complexos e fáceis de errar manualmente, injetando marcadores <<SYS>> dentro das tags de instrução [INST].
+
+<s>[INST] <<SYS>>
+Você é um assistente conciso.
+<<SYS>>
+
+Qual a cor do céu? [/INST] O céu é azul. </s><s>[INST] E à noite? [/INST]
+
+------------------------------
+## Resumo das Diferenças
+
+| Modelo | Token de Início de Turno | Token de Fim de Turno | Tag de Mensagem de Sistema |
+|---|---|---|---|
+| ChatML / Qwen | `< | im_start | >[role]\n` |
+| Llama 3 / 3.1 | `< | start_header_id | >[role]< |
+| Gemma | <start_of_turn>[role]\n | <end_of_turn>\n | Nativa (system) |
+| Mistral | [INST] | [/INST] | Embutida no primeiro [INST] |
+
+💡 Nota Importante: Para evitar quebrar a IA, nunca monte essas strings manualmente no seu código. Use sempre a função tokenizer.apply_chat_template(messages) da biblioteca Hugging Face Transformers. Ela lê o arquivo tokenizer_config.json do modelo específico e injeta as tags perfeitamente. [2, 5] 
+
+Se você estiver desenvolvendo uma aplicação, me diga:
+
+* 
+* Qual modelo específico você pretende usar?
+* Você está montando um arquivo para treinamento (Fine-Tuning) ou para inferência (API/Prompt)?
+* 
+
+Posso gerar o código Python exato com o template Jinja2 correto para o seu caso.
+
+
+https://qwen.readthedocs.io/en/v2.0/inference/chat.html

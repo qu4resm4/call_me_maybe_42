@@ -6,14 +6,14 @@
 #   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
 #                                                  +#+#+#+#+#+   +#+          #
 #   Created: 2026/07/22 22:15:08 by gquaresm            #+#    #+#            #
-#   Updated: 2026/07/28 10:26:12 by gquaresm           ###   ########.fr      #
+#   Updated: 2026/08/03 19:17:21 by gquaresm           ###   ########.fr      #
 #                                                                             #
 # ########################################################################### #
 
 from enum import StrEnum
 from numbers import Number
-from typing import Literal, Optional
-from pydantic import BaseModel
+from typing import Literal, TypeAlias, Any, Optional
+from pydantic import BaseModel, Field
 
 # -----------------------------------------------------------------------------
 #
@@ -84,3 +84,38 @@ class ChatMLRole(StrEnum):
 class ChatMLTemplate(BaseModel):
     role: Literal["system", "user", "assistant", "tool"]
     content: Optional[str]
+
+
+class SystemMessage(BaseModel):
+    role: Literal[ChatMLRole.SYSTEM]
+    content: str
+
+
+class UserMessage(BaseModel):
+    role: Literal[ChatMLRole.USER]
+    content: str
+
+
+class ToolCall(BaseModel):
+    name: str
+    arguments: dict[str, Any]
+
+
+class AssistantMessage(BaseModel):
+    role: Literal[ChatMLRole.ASSISTANT]
+    content: str | None = None
+    think: str | None = None
+    tool_calls: list[ToolCall] = Field(default_factory=list)
+
+
+class ToolMessage(BaseModel):
+    role: Literal[ChatMLRole.TOOL]
+    content: str
+
+
+ChatMessage: TypeAlias = (
+    SystemMessage
+    | UserMessage
+    | AssistantMessage
+    | ToolMessage
+)

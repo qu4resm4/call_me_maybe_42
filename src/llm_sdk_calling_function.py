@@ -6,17 +6,30 @@
 #   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
 #                                                  +#+#+#+#+#+   +#+          #
 #   Created: 2026/07/20 22:35:54 by gquaresm            #+#    #+#            #
-#   Updated: 2026/07/31 10:55:09 by gquaresm           ###   ########.fr      #
+#   Updated: 2026/08/03 19:28:38 by gquaresm           ###   ########.fr      #
 #                                                                             #
 # ########################################################################### #
 
-from typing import Any, cast
+# from typing import Any, cast
+
+import re
+import json
 
 from pydantic import ConfigDict, validate_call
 
 from llm_sdk import Small_LLM_Model, torch    # type: ignore[attr-defined]
 
-from src.schemas import ChatMLRole, ChatMLTemplate, FunctionDefinition
+from src.schemas import (
+    AssistantMessage,
+    ChatMLRole,
+    FunctionDefinition,
+    SystemMessage,
+    ToolCall,
+    ToolMessage,
+    UserMessage,
+    ChatMessage,
+    ChatMLTemplate
+)
 
 
 class Model_with_Calling_Function(Small_LLM_Model):
@@ -42,6 +55,179 @@ class Model_with_Calling_Function(Small_LLM_Model):
         self.token_restrictor = token_restrictor
         self.function_schemas: list[dict] = []
         self._max_tokens: int = 20000    # vinte mil
+
+        start, end = self.__discover_message_delimiters()
+        self.message_start_str: str = start
+        self.message_end_str: str = end
+        self.message_start_token: int = self.encode(start).tolist()[0][0]
+        self.message_end_token: int = self.encode(end).tolist()[0][0]
+        # print(f"start: {start}, end: {end}")
+        # print("message_start_token: ", self.message_start_token)
+        # print("message_end_token: ", self.message_end_token)
+
+    @validate_call
+    def __discover_message_delimiters(self) -> tuple[str, str]:
+        sentinel = "__CALL_ME_MAYBE_SENTINEL__"
+        rendered = self._tokenizer.apply_chat_template(
+            [
+                {
+                    "role": ChatMLRole.USER.value,
+                    "content": sentinel,
+                }
+            ],
+            tokenize=False,
+            add_generation_prompt=False,
+        )
+        role = ChatMLRole.USER.value
+        if isinstance(rendered, str):
+            role_index = rendered.index(role)
+            sentinel_index = rendered.index(sentinel)
+
+            return (
+                    rendered[:role_index],
+                    rendered[sentinel_index + len(sentinel):].strip()
+                )
+        return ("", "")
+
+    @validate_call
+    def _split_context(
+        self,
+        context: list[int],
+    ) -> list[list[int]]:
+        """
+        Recebe uma sequência completa de token_ids (histórico do chat) e separa
+        cada mensagem individual utilizando os tokens especiais de início e fim
+        descobertos durante a inicialização.
+
+        Exemplo de entrada:
+
+        [
+            151644, ..., 151645,
+            151644, ..., 151645,
+            151644, ..., 151645,
+        ]
+
+        Retorno:
+
+        [
+            [151644, ..., 151645],
+            [151644, ..., 151645],
+            [151644, ..., 151645],
+        ]
+        """
+
+        messages: list[list[int]] = []
+        current_message: list[int] = []
+        inside_message = False
+        for token in context:
+            # Encontrou o início de uma nova mensagem.
+            # Caso uma mensagem anterior tenha ficado incompleta,
+            # ela é descartada e iniciamos uma nova.
+            if token == self.message_start_token:
+                current_message = [token]
+                inside_message = True
+                continue
+            # Enquanto estivermos dentro de uma mensagem,
+            # acumulamos todos os tokens exatamente como foram
+            # produzidos pelo modelo/tokenizer.
+            if inside_message:
+                current_message.append(token)
+                # Ao encontrar o delimitador de fim,
+                # armazenamos a mensagem completa e
+                # voltamos ao estado "fora de mensagem".
+                if token == self.message_end_token:
+                    messages.append(current_message)
+                    current_message = []
+                    inside_message = False
+        return messages
+
+    @validate_call
+    def _parse_context(
+        self,
+        context: list[int],
+    ) -> list[ChatMessage]:
+        messages = self._split_context(context)
+        parsed_messages: list[ChatMessage] = []
+
+        for message_tokens in messages:
+            text = self.decode(message_tokens).strip()
+
+            if not text:
+                continue
+            role, body = text.split(maxsplit=1)
+            role = ChatMLRole(role)
+
+            if role is ChatMLRole.SYSTEM:
+                parsed_messages.append(
+                    SystemMessage(
+                        role=role,
+                        content=body.strip(),
+                    )
+                )
+
+            elif role is ChatMLRole.USER:
+                parsed_messages.append(
+                    UserMessage(
+                        role=role,
+                        content=body.strip(),
+                    )
+                )
+
+            elif role is ChatMLRole.TOOL:
+                parsed_messages.append(
+                    ToolMessage(
+                        role=role,
+                        content=body.strip(),
+                    )
+                )
+
+            elif role is ChatMLRole.ASSISTANT:
+                think: str | None = None
+                tool_calls: list[ToolCall] = []
+                think_match = re.search(
+                    r"<think>(.*?)</think>",
+                    body,
+                    flags=re.DOTALL,
+                )
+
+                if think_match:
+                    think = think_match.group(1).strip()
+                    body = (
+                        body[:think_match.start()]
+                        + body[think_match.end():]
+                    )
+
+                for tool_match in re.finditer(
+                    r"<tool_call>(.*?)</tool_call>",
+                    body,
+                    flags=re.DOTALL,
+                ):
+
+                    tool_json = tool_match.group(1).strip()
+
+                    data = json.loads(tool_json)
+
+                    tool_calls.append(
+                        ToolCall.model_validate(data)
+                    )
+
+                body = re.sub(
+                    r"<tool_call>.*?</tool_call>",
+                    "",
+                    body,
+                    flags=re.DOTALL,
+                ).strip()
+
+                parsed_messages.append(
+                    AssistantMessage(
+                        role=role,
+                        think=think,
+                        tool_calls=tool_calls,
+                        content=body if body else None,
+                    )
+                )
+
+        return parsed_messages
 
     @validate_call
     def bind_functions(
@@ -71,7 +257,7 @@ class Model_with_Calling_Function(Small_LLM_Model):
     @validate_call
     def format_prompt_to_calling_function(
         self,
-        messages: list[ChatMLTemplate]
+        messages: list[ChatMessage]
     ) -> str:
         """."""
         if len(self.function_schemas) == 0:
