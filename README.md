@@ -209,3 +209,153 @@ printando response []
 
 
 https://huggingface.co/docs/transformers/chat_response_parsing
+
+
+ChatML (Chat Markup Language) is a structured text format that organizes conversations for AI models using special tokens and roles like system, user, and assistant.Key Parts of ChatMLSpecial Tokens: Uses tags like <|im_start|> and <|im_end|> to mark where a message begins and ends.Roles: Identifies who is speaking using labels like system, user, assistant, and tool.Why People Use ItClear Boundaries: Stops the AI from getting confused about who gave an instruction.Better Safety: Helps block prompt injection attacks by separating developer rules from user text.Standard Control: Works well across many different open-source and commercial language models.Would you like to see a code example of how a ChatML prompt is written, or do you want to learn how to use it in an API request?
+
+
+    # Special tokens support (moved from SpecialTokensMixin)
+    # V5: Clean separation of named special tokens from extra special tokens
+    SPECIAL_TOKENS_ATTRIBUTES = [
+        "bos_token",
+        "eos_token",
+        "unk_token",
+        "sep_token",
+        "pad_token",
+        "cls_token",
+        "mask_token",
+    ]
+
+
+Esses atributos vêm da biblioteca Hugging Face Transformers e representam os principais tokens especiais usados na história do Processamento de Linguagem Natural (PLN). Modelos diferentes (como Qwen, BERT, GPT, Llama) usam esses tokens para propósitos específicos.
+Aqui está a explicação direta do papel de cada um:
+## 1. bos_token (Beginning of Sequence)
+
+* O que faz: Indica o início absoluto de um texto ou documento.
+* Para que serve: Avisa o modelo que uma nova sequência está começando do zero. Ao gerar texto livre, o modelo usa esse token como o primeiro "input" para começar a prever a primeira palavra.
+* Exemplos comuns: <s>, <|startoftext|>.
+
+## 2. eos_token (End of Sequence)
+
+* O que faz: Indica o fim absoluto de um texto ou documento.
+* Para que serve: Como vimos no Qwen, ele avisa o modelo (e o script de inferência) que a geração de texto chegou ao fim e o processo deve ser interrompido.
+* Exemplos comuns: </s>, <|endoftext|>, <|im_end|>.
+
+## 3. unk_token (Unknown Token)
+
+* O que faz: Representa uma palavra ou caractere desconhecido pelo vocabulário do modelo.
+* Para que serve: Se o usuário digitar algo que o tokenizador não consegue processar (como um caractere japonês raro em um modelo puramente inglês), esse caractere é substituído pelo unk_token para o modelo não quebrar.
+* Nota moderna: LLMs modernos (como o Qwen e o Llama) usam tokenizadores do tipo Byte-Pair Encoding (BPE) baseados em bytes. Eles quase nunca usam o unk_token, pois conseguem quebrar qualquer palavra desconhecida em bytes brutos.
+* Exemplos comuns: <unk>, [UNK].
+
+## 4. sep_token (Separator Token)
+
+* O que faz: Separa duas partes distintas de um mesmo texto na mesma entrada.
+* Para que serve: Era muito usado em modelos de arquitetura Encoder (como o BERT) para tarefas que envolviam dois blocos de texto. Por exemplo: separar a Pergunta do Contexto em tarefas de responder perguntas, ou separar a Frase A da Frase B.
+* Exemplos comuns: [SEP], </s>.
+
+## 5. pad_token (Padding Token)
+
+* O que faz: Serve para preenchimento de espaço vazio.
+* Para que serve: As GPUs processam dados em lotes (batches), e todas as sequências de um lote precisam ter exatamente o mesmo tamanho (comprimento de matriz). Se você processa uma frase de 5 tokens e uma de 10 tokens juntas, o modelo adiciona o pad_token 5 vezes no final da frase menor para equilibrar os comprimentos.
+* Exemplos comuns: <pad>, [PAD], <|endoftext|>.
+
+## 6. cls_token (Classification Token)
+
+* O que faz: Token de classificação posicionado no início do texto.
+* Para que serve: Muito específico da arquitetura BERT. O modelo é treinado para consolidar a representação semântica de toda a frase dentro do vetor desse único token. Se você quer classificar se uma frase é positiva ou negativa, você passa o vetor gerado na posição do cls_token para uma camada linear de classificação.
+* Exemplos comuns: [CLS].
+
+## 7. mask_token (Masked Token)
+
+* O que faz: Serve para mascarar (esconder) uma palavra.
+* Para que serve: Usado no pré-treinamento de modelos de linguagem mascarados (como o BERT novamente). O script substitui palavras aleatórias do texto por esse token (Ex: "O gato subiu no [MASK]") e força o modelo a adivinhar qual era a palavra original ("telhado") para aprender o idioma.
+* Exemplos comuns: [MASK], <mask>.
+
+------------------------------
+## Resumo prático para o seu Qwen:
+Como o Qwen é um modelo do tipo Causal LM (Decoder-only) focado em chat, os únicos tokens dessa lista que realmente importam ativamente no seu dia a dia de código são o eos_token (para parar o chat no momento certo) e o pad_token (para você conseguir treinar ou rodar inferência em lote/batch). Atributos como cls_token, sep_token e mask_token geralmente ficam vazios (None) no Qwen.
+Se você quiser, posso te mostrar como aplicar o pad_token e o eos_token na prática em um script do Hugging Face usando o DataCollatorForSeq2Seq para preparar dados de treino, ou como configurar o attention mask para ignorar os tokens de pad. O que prefere ver agora?
+
+
+
+---
+
+2. What your added_tokens list in tokenizer.json actually is
+The tokenizer.json file is the serialized fast tokenizer from the tokenizers library. It contains: vocabulary, merges, pre/post-processing, plus a list called added_tokens. (Hugging Face)
+
+Your added_tokens snippet:
+
+151643 <|endoftext|> true
+151644 <|im_start|> true
+151645 <|im_end|> true
+151646 <|object_ref_start|> true
+151647 <|object_ref_end|> true
+151648 <|box_start|> true
+151649 <|box_end|> true
+151650 <|quad_start|> true
+151651 <|quad_end|> true
+151652 <|vision_start|> true
+151653 <|vision_end|> true
+151654 <|vision_pad|> true
+151655 <|image_pad|> true
+151656 <|video_pad|> true
+151657 <tool_call> false
+151658 </tool_call> false
+151659 <|fim_prefix|> false
+151660 <|fim_middle|> false
+151661 <|fim_suffix|> false
+151662 <|fim_pad|> false
+151663 <|repo_name|> false
+151664 <|file_sep|> false
+151665 <tool_response> false
+151666 </tool_response> false
+151667 <think> false
+151668 </think> false
+Here:
+
+The first column is the token ID.
+The middle column is the string form of the token.
+The last true/false is the Rust-tokenizer-level special flag. (paddlenlp.readthedocs.io)
+What that flag does in the fast tokenizer:
+
+special = true
+
+The token is treated as an indivisible “added token”.
+The pre-tokenizer will not split it into smaller pieces.
+When you decode with skip_special_tokens=True, these tokens will be removed. (Hugging Face)
+special = false
+
+The token is just an extra vocab token. It may still be one piece, but it does not get special handling in the tokenizer’s decode / skip logic.
+
+
+https://discuss.huggingface.co/t/how-to-understand-the-special-tokens/170916/2
+
+
+---
+
+mensagens (dict)
+        │
+        ▼
+apply_chat_template
+        │
+        ▼
+tokens
+        │
+        ▼
+LLM
+        │
+        ▼
+tokens gerados
+        │
+        ▼
+separar mensagens pelos delimitadores
+        │
+        ▼
+decode de cada mensagem
+        │
+        ▼
+parser XML/JSON
+        │
+        ▼
+dict Python
