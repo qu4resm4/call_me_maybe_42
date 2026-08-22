@@ -6,13 +6,14 @@
 #   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
 #                                                  +#+#+#+#+#+   +#+          #
 #   Created: 2026/07/22 22:15:08 by gquaresm            #+#    #+#            #
-#   Updated: 2026/08/03 19:17:21 by gquaresm           ###   ########.fr      #
+#   Updated: 2026/08/09 13:43:29 by gquaresm           ###   ########.fr      #
 #                                                                             #
 # ########################################################################### #
 
+from abc import ABC
 from enum import StrEnum
 from numbers import Number
-from typing import Literal, TypeAlias, Any, Optional
+from typing import Literal, Any
 from pydantic import BaseModel, Field
 
 # -----------------------------------------------------------------------------
@@ -81,41 +82,32 @@ class ChatMLRole(StrEnum):
     TOOL = "tool"
 
 
-class ChatMLTemplate(BaseModel):
-    role: Literal["system", "user", "assistant", "tool"]
-    content: Optional[str]
+class ChatMessage(BaseModel, ABC):
+    pass
 
 
-class SystemMessage(BaseModel):
+class SystemMessage(ChatMessage):
     role: Literal[ChatMLRole.SYSTEM]
     content: str
 
 
-class UserMessage(BaseModel):
+class UserMessage(ChatMessage):
     role: Literal[ChatMLRole.USER]
     content: str
 
 
-class ToolCall(BaseModel):
+class ToolCall(ChatMessage):
     name: str
     arguments: dict[str, Any]
 
 
-class AssistantMessage(BaseModel):
+class AssistantMessage(ChatMessage):
     role: Literal[ChatMLRole.ASSISTANT]
     content: str | None = None
     think: str | None = None
     tool_calls: list[ToolCall] = Field(default_factory=list)
 
 
-class ToolMessage(BaseModel):
+class ToolMessage(ChatMessage):
     role: Literal[ChatMLRole.TOOL]
     content: str
-
-
-ChatMessage: TypeAlias = (
-    SystemMessage
-    | UserMessage
-    | AssistantMessage
-    | ToolMessage
-)

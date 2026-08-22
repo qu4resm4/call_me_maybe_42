@@ -6,11 +6,11 @@
 #   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
 #                                                  +#+#+#+#+#+   +#+          #
 #   Created: 2026/07/20 22:35:54 by gquaresm            #+#    #+#            #
-#   Updated: 2026/08/03 19:28:38 by gquaresm           ###   ########.fr      #
+#   Updated: 2026/08/16 12:41:58 by gquaresm           ###   ########.fr      #
 #                                                                             #
 # ########################################################################### #
 
-# from typing import Any, cast
+from typing import cast
 
 import re
 import json
@@ -27,8 +27,7 @@ from src.schemas import (
     ToolCall,
     ToolMessage,
     UserMessage,
-    ChatMessage,
-    ChatMLTemplate
+    ChatMessage
 )
 
 
@@ -42,8 +41,10 @@ class Model_with_Calling_Function(Small_LLM_Model):
         device: str | None = None,
         dtype: torch.dtype | None = None,
         trust_remote_code: bool = True,
-        token_selector: str = "greedy",  # or "sampling"
-        token_restrictor: str = "dfa",  # or "trie" or "grammar"
+        verbose_mode: bool = False,
+        token_selector: str = "greedy",  # or "sampling" #não faz sentido vou acabar tirando isso
+        token_restrictor: str = "dfa",  # or "trie" or "grammar" #não faz sentido vou acabar tirando isso
+        max_tokens: int = 20000    # vinte mil
     ) -> None:
         super().__init__(
                 model_name,
@@ -54,16 +55,18 @@ class Model_with_Calling_Function(Small_LLM_Model):
         self.token_selector = token_selector
         self.token_restrictor = token_restrictor
         self.function_schemas: list[dict] = []
-        self._max_tokens: int = 20000    # vinte mil
+        self._max_tokens: int = max_tokens
+        self.verbose_mode: bool = verbose_mode
 
         start, end = self.__discover_message_delimiters()
         self.message_start_str: str = start
         self.message_end_str: str = end
         self.message_start_token: int = self.encode(start).tolist()[0][0]
         self.message_end_token: int = self.encode(end).tolist()[0][0]
-        # print(f"start: {start}, end: {end}")
-        # print("message_start_token: ", self.message_start_token)
-        # print("message_end_token: ", self.message_end_token)
+        if self.verbose_mode:
+            print(f"start: {start}, end: {end}")
+            print("message_start_token: ", self.message_start_token)
+            print("message_end_token: ", self.message_end_token)
 
     @validate_call
     def __discover_message_delimiters(self) -> tuple[str, str]:
@@ -90,7 +93,7 @@ class Model_with_Calling_Function(Small_LLM_Model):
         return ("", "")
 
     @validate_call
-    def _split_context(
+    def __split_context(
         self,
         context: list[int],
     ) -> list[list[int]]:
@@ -146,7 +149,15 @@ class Model_with_Calling_Function(Small_LLM_Model):
         self,
         context: list[int],
     ) -> list[ChatMessage]:
-        messages = self._split_context(context)
+        """_summary_
+
+        Args:
+            context (list[int]): _description_
+
+        Returns:
+            list[ChatMessage]: _description_
+        """    
+        messages = self.__split_context(context)
         parsed_messages: list[ChatMessage] = []
 
         for message_tokens in messages:
@@ -240,7 +251,7 @@ class Model_with_Calling_Function(Small_LLM_Model):
         ])
 
     @validate_call
-    def format_prompt(self, messages: list[ChatMLTemplate]) -> str:
+    def format_prompt(self, messages: list[ChatMessage]) -> str:
         """."""
         formatted_messages = [
             msg.model_dump(exclude_none=True) for msg in messages
@@ -255,7 +266,7 @@ class Model_with_Calling_Function(Small_LLM_Model):
         return ""
 
     @validate_call
-    def format_prompt_to_calling_function(
+    def format_prompt_with_functions(
         self,
         messages: list[ChatMessage]
     ) -> str:
@@ -264,7 +275,8 @@ class Model_with_Calling_Function(Small_LLM_Model):
             msg = ("call_me_maybe: "
                    "It is necessary to associate function schemas.\n")
             raise Exception(msg)
-        # Converter os modelos Pydantic de volta para dicts para o transformers
+        # Converter os modelos Pydantic de volta para dicts para
+        # o aplicar prompt template
         formatted_messages = [
             msg.model_dump(exclude_none=True) for msg in messages
         ]
@@ -274,144 +286,154 @@ class Model_with_Calling_Function(Small_LLM_Model):
             tokenize=False,
             add_generation_prompt=True
         )
-        return return_value
+        if isinstance(return_value, str):
+            return return_value
+        return ""
 
     @validate_call
-    def parse_response(
+    def invoke_calling_function(
+       self,
+       prompt: str | list[ChatMessage]
+    ) -> list[ChatMessage]:
+        """;"""
+        if len(self.function_schemas) == 0:
+            msg = ("call_me_maybe: "
+                   "It is necessary to associate function schemas.\n")
+            raise Exception(msg)
+
+        if isinstance(prompt, str):
+            prompt = cast(
+                list[ChatMessage],
+                [
+                    UserMessage(
+                        role=ChatMLRole.USER,
+                        content=prompt
+                    )
+                ]
+            )
+        formatted_prompt = self.format_prompt_with_functions(prompt)    # já funciona e testado
+
+        input_ids = self.encode(formatted_prompt)
+
+        context: list[int] = input_ids.tolist()[0]
+        initial_context_len = len(context)
+        if self.verbose_mode:
+            print(self.decode(context), end="", flush=True)
+
+        stop_condition = False
+        while not stop_condition:
+            # Obtém a distribuição para o próximo token
+            logits = self.get_logits_from_input_ids(context)
+            next_token_id: int = 0
+            # como isso funcionaria internamente  e como os 3 componentes separariam a responsabilidade de cada e conversariam entre si?
+            logits = token_restrictor.restrict(
+                logits,
+                generation_state
+            )
+            next_token_id = token_selector.select(logits)    # faz sentido ser uma classe a parte pois guardaria que tipo de 
+            input_ids.append(next_token)    # sugestão desatualizada
+            generation_state.update(next_token)    # pra que isso seria util, não seria apenas manter a lista de tokens (context var) aqui no metodo?
+
+            if self.verbose_mode:
+                print(self.decode([next_token_id]), end="", flush=True)
+
+            if generation_state.is_finished():    # como isso funcionaria?
+                break
+            if (len(context) - initial_context_len) >= self._max_tokens:
+                break
+            # Verifica se terminou
+            if next_token_id == self._tokenizer.eos_token_id:
+                break
+
+        response = self._parse_context(context)    # já funciona e testado
+        return response
+
+    @validate_call
+    def invoke_calling_function(
         self,
-        response: str
-    ) -> list[dict[str, str]]:
-        """ reverso do apply_chat_template que usa os otkens especificos
-         do modelo que delimita cada coisa"""
-        schema = ChatMLTemplate.model_json_schema()
-        r_value = self._tokenizer.parse_response(response, schema)
-        #r_value = self._tokenizer.parse_response(response)
-        # Normalize returned value to list[dict[str, str]] for Pylance e Mypy
-        print("r_value fdp:", r_value)
-        return r_value
+        prompt: str | list[ChatMessage]
+    ) -> list[ChatMessage]:
+        """;"""
+        if len(self.function_schemas) == 0:
+            msg = ("call_me_maybe: "
+                   "It is necessary to associate function schemas.\n")
+            raise Exception(msg)
 
+        if isinstance(prompt, str):
+            prompt = cast(
+                list[ChatMessage],
+                [
+                    UserMessage(
+                        role=ChatMLRole.USER,
+                        content=prompt
+                    )
+                ]
+            )
+        formatted_prompt = self.format_prompt_with_functions(prompt)    # já funciona e testado
 
-# import re
-# from transformers import AutoTokenizer
+        input_ids = self.encode(formatted_prompt)
 
-# def parse_response_dynamically(response_text: str, tokenizer: AutoTokenizer) -> list[dict]:
-#     """
-#     Tenta decodificar o texto de qualquer LLM lendo seus atributos de chat e tokens nativos.
-#     """
-#     # 1. Tenta usar o recurso nativo de parsing do transformers (se o modelo já suportar)
-#     if getattr(tokenizer, "response_schema", None) is not None:
-#         try:
-#             return tokenizer.parse_response(response_text)
-#         except Exception:
-#             pass
+        context: list[int] = input_ids.tolist()[0]
+        initial_context_len = len(context)
+        if self.verbose_mode:
+            print(self.decode(context), end="", flush=True)
+        context = input_ids.tolist()[0]
+        state = GenerationState(
+            function_schemas=self.function_schemas,
+            tokenizer=self._tokenizer,
+        )
 
-#     # 2. Descobre tokens especiais diretamente do tokenizer do modelo
-#     special_tokens = list(tokenizer.all_special_tokens)
-    
-#     # 3. Detecta os marcadores de role inspecionando o Jinja Chat Template
-#     chat_template = getattr(tokenizer, "chat_template", "") or ""
-    
-#     # Padrão ChatML (<|im_start|>, <|im_end|>)
-#     if "<|im_start|>" in chat_template or "<|im_start|>" in special_tokens:
-#         pattern = r"<\|im_start\|>(\w+)\n?(.*?)(?=<\|im_end\|>|$)"
-#         matches = re.findall(pattern, response_text, re.DOTALL)
-#         if matches:
-#             return [{"role": role.strip(), "content": content.strip()} for role, content in matches]
-
-#     # Padrão Llama 3 / Qwen 2.5 (<|start_header_id|> user <|end_header_id|>)
-#     if "<|start_header_id|>" in chat_template or "<|start_header_id|>" in special_tokens:
-#         pattern = r"<\|start_header_id\|>(\w+)<\|end_header_id\|>\n\n(.*?)(?=<\|eot_id\|>|<|start_header_id\|>|$)"
-#         matches = re.findall(pattern, response_text, re.DOTALL)
-#         if matches:
-#             return [{"role": role.strip(), "content": content.strip()} for role, content in matches]
-
-#     # Padrão Mistral / Llama 2 ([INST] ... [/INST])
-#     if "[INST]" in chat_template or "[INST]" in special_tokens:
-#         # Mistral não marca claramente a resposta do assistente com tags específicas,
-#         # ela fica apenas fora do [INST]
-#         clean_text = re.sub(r"\[INST\].*?\[/INST\]", "", response_text, flags=re.DOTALL).strip()
-#         # Remove EOS tokens do modelo
-#         for eos in [tokenizer.eos_token, "</s>"]:
-#             if eos:
-#                 clean_text = clean_text.replace(eos, "").strip()
-#         return [{"role": "assistant", "content": clean_text}]
-
-#     # Fallback genérico: Limpa tokens de fim de texto (EOS/PAD) e assume que é a resposta do assistente
-#     clean_text = response_text
-#     for token in tokenizer.all_special_tokens:
-#         clean_text = clean_text.replace(token, "")
-    
-#     return [{"role": "assistant", "content": clean_text.strip()}]
-
-
-    # @validate_call
-    # def invoke_calling_function(
-    #    self,
-    #    prompt: str
-    # ) -> Any:
-    #     """;"""
-    #     if len(self.function_schemas) == 0:
-    #         msg = ("call_me_maybe: "
-    #                "It is necessary to associate function schemas.\n")
-    #         raise Exception(msg)
-
-    #     input_ids = self.encode(prompt)
-        
-    #     context: list[int] = input_ids.tolist()[0]
-        
-    #     print("primeiro contexto: ", context)
-    #     print("tipo contexto: ", type(context))
-
-    #     stop_condition = False
-    #     while not stop_condition:
-    #         logits = self.get_logits_from_input_ids(input_ids)
-    #         logits = token_restrictor.restrict(
-    #             logits,
-    #             generation_state
-    #         )
-    #         next_token = token_selector.select(logits)
-    #         input_ids.append(next_token)
-    #         generation_state.update(next_token)
-    #         if next_token == eos_token:
-    #             break
-    #         if generation_state.is_finished():
-    #             break
-    #         if len(generated) >= self._max_tokens:
-    #             break
-            
-    #     token_str = self.decode(context)
-    #     response = self.parse_response(token_str)
-    #     # pegar a última mensagem de assistant?
-    #     return response
+        while True:
+            logits = self.get_logits_from_input_ids(context)
+            restricted_logits = self.token_restrictor.restrict(
+                logits,
+                state,
+            )
+            next_token_id = self.token_selector.select(
+                restricted_logits
+            )
+            context.append(next_token_id)
+            state.consume(next_token_id)
+            if self.verbose_mode:
+                print(
+                    self.decode([next_token_id]),
+                    end="",
+                    flush=True
+                )
+            if state.is_finished():
+                break
+            if len(context) - initial_context_len >= self._max_tokens:
+                break
+        response = self._parse_context(context)
+        return response
 
     @validate_call
     def invoke(
         self,
-        prompt: str | list[ChatMLTemplate]
-    ) -> str:
+        prompt: str | list[ChatMessage]
+    ) -> list[ChatMessage]:
         """."""
-        # Tokeniza o prompt
-        import os
-
         if isinstance(prompt, str):
-            prompt = [
-                ChatMLTemplate(
-                    role=ChatMLRole.USER.value,
-                    content=prompt
-                )
-            ]
+            prompt = cast(
+                list[ChatMessage],
+                [
+                    UserMessage(
+                        role=ChatMLRole.USER,
+                        content=prompt
+                    )
+                ]
+            )
         formatted_prompt = self.format_prompt(prompt)
 
         input_ids = self.encode(formatted_prompt)
 
         context: list[int] = input_ids.tolist()[0]
+        if self.verbose_mode:
+            print(self.decode(context), end="", flush=True)
 
         while True:
             # Obtém a distribuição para o próximo token
             logits = self.get_logits_from_input_ids(context)
-
-            os.system('cls' if os.name == 'nt' else 'clear')
-            print("contexto atual: ", self.decode(context))
 
             # Escolhe um token (Greedy, por enquanto)
             # next_token = max(logits)   # argmax(logits)
@@ -424,55 +446,16 @@ class Model_with_Calling_Function(Small_LLM_Model):
 
             # Acrescenta o token ao contexto
             context.append(next_token_id)
+            if self.verbose_mode:
+                print(self.decode([next_token_id]), end="", flush=True)
 
             # Verifica se terminou
             if next_token_id == self._tokenizer.eos_token_id:
                 break
 
-        # token_str = self.decode(context)
-        token_str = self._tokenizer.decode(context, skip_special_tokens=False)
-        print("TESTES sem skip", token_str)
-        response = self.parse_response(token_str)
-        # pegar a última mensagem de assistant?
-        print("printando response", response)
+        response = self._parse_context(context)
         return response
 
-#         from langchain_core.tools import tool
-# from langchain_openai import ChatOpenAI
-
-# # 1. Define the function using the @tool decorator
-# @tool
-# def multiply_numbers(a: int, b: int) -> int:
-#     """Multiply two integers together. Use this tool whenever math
-#  multiplication is required."""
-#     return a * b
-
-# # 2. Initialize your LLM model
-# model = ChatOpenAI(model="gpt-4o", temperature=0)
-
-# # 3. Bind the tool directly to the model
-# model_with_tools = model.bind_tools([multiply_numbers])
-
-# # 4. Invoke the model with a query requiring the tool
-# user_query = "What is 42 multiplied by 7?"
-# ai_message = model_with_tools.invoke(user_query)
-
-# # 5. Inspect the generated tool call payload
-# print("Tool Calls Request:")
-# print(ai_message.tool_calls)
-
-# # 6. Execute the actual function using the arguments provided by the model
-# if ai_message.tool_calls:
-#     tool_call = ai_message.tool_calls[0]
-#     arguments = tool_call["args"] # Extract arguments dictionary
-
-#     # Run the native function
-#     result = multiply_numbers.invoke(arguments)
-#     print(f"\nExecution Result: {result}")
-
-    # método para registrar calling functions
-
-    # método para invokar o modelo restritamente para calling functions
 
     # ? métodos privados para esse fluxo de saída estruturada
 
@@ -482,8 +465,6 @@ class Model_with_Calling_Function(Small_LLM_Model):
     # chamada de reconhecer função, invokar o modelo para obrigar uma saída
     # JSON estruturada especifica)
 
-    #
-
     # pass
 
     # método para pegar os logits dos valores restritos de tipo
@@ -491,7 +472,7 @@ class Model_with_Calling_Function(Small_LLM_Model):
     # para cada modelo > tokenizer.encode("true") > obtém os IDs > guarda
     #  internamente
 
-    # ppara verificar se não for igual, verifica se o estado atual inclui
+    # para verificar se não for igual, verifica se o estado atual inclui
 
     # como saber quais tokens são validos: restrição em json qual algoritmo
     # ou qual mescla de algoritmos para que seja possível mais de um modelo
@@ -517,7 +498,6 @@ class Model_with_Calling_Function(Small_LLM_Model):
 # DFA
 # Trie
 # Grammar
-
 
 
 # classe para gerenciar estados da geração?

@@ -6,7 +6,7 @@
 #   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
 #                                                  +#+#+#+#+#+   +#+          #
 #   Created: 2026/06/16 15:50:25 by gquaresm            #+#    #+#            #
-#   Updated: 2026/08/03 19:20:09 by gquaresm           ###   ########.fr      #
+#   Updated: 2026/08/09 16:06:30 by gquaresm           ###   ########.fr      #
 #                                                                             #
 # ########################################################################### #
 
@@ -168,6 +168,7 @@ def main() -> int:
             ]
             # prompts_input = json.load(f)
     except Exception as err:
+        # mudar prints de erro
         print("call_me_maybe: error reading the files")
         if isinstance(err, TypeError):
             print("call_me_maybe: Invalid schema, "
@@ -175,13 +176,23 @@ def main() -> int:
             print("call_me_maybe: TypeError\n\n", err)
         sys.exit(1)
 
-    llm = Model_with_Calling_Function(args.model)
+    llm = Model_with_Calling_Function(args.model, verbose_mode=True)
 
     llm.bind_functions(function_schemas)
+
+    print("--------- Functions Input ---------")
+    print(function_schemas)
+    print("--------- Prompts Input ---------")
+    print(prompts_input)
+    print()
 
     json_responses = []
     for json_prompt in prompts_input:
         json_responses.append(llm.invoke_calling_function(json_prompt.prompt))
+        print("--------------- mensagens -------------------")
+        for message in messages:
+            print(message.model_dump())
+
         # definir tipo de retorno () geração em json, conversão para esquema
         # entrega em esquema
         # conversão para json para escrita no arquivo após
@@ -203,161 +214,151 @@ def testes() -> None:
     print(args.input)
     print(args.output)
     print(args.model)
-    llm = Model_with_Calling_Function(args.model)
+    llm = Model_with_Calling_Function(args.model, verbose_mode=True)
 
-    print(llm._tokenizer.chat_template)
-
-    # print(llm.format_prompt([
-    #     ChatMessage.model_validate({
-    #         "role": "system",
-    #         "content": "You are a friendly chatbot who always responds in the style of a pirate"
-    #     }),
-    #     ChatMessage.model_validate({
-    #         "role": "user",
-    #         "content": "How many helicopters can a human eat in one sitting?"
-    #     })
-    # ]))
-
-    # def get_weather(location: str) -> str:
-    #    """Gets the current weather for a location.
-
-    #    Args:
-    #        location: City and state, e.g. San Francisco, CA
-    #    """
-    #    return "22°C"
-
-    llm.bind_functions([
-           {
-               "name": "get_weather",
-               "description": "Gets the current weather for a location.",
-               "parameters": {
-                   "location": {"type": "string"}
-               },
-               "returns": {
-                   "type": "string"
-               }
-           }
-       ])
-
-    formatted_text = llm.format_prompt_to_calling_function(
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a helpful assistant."
-            },
-            {
-                "role": "user",
-                "content": "What's the weather?"
-            },
-            {
-                "role": "assistant",
-                "think": "Need to call weather function.",
-                "tool_calls": [
-                    {
-                        "name": "get_weather",
-                        "arguments": {
-                            "city": "Rio de Janeiro"
-                        }
-                    }
-                ],
-                "content": None
-            }
-        ]
-    )
-    print(formatted_text)
-
-    tokens_id = llm.encode(formatted_text).tolist()[0]
-
-    messages = llm._parse_context(tokens_id)
-    
-    print("--------------- mensagens -------------------")
-    for message in messages:
-        print(message.model_dump())
-
-    #print(llm.invoke(formatted_text))
-
-    
-        # {
-        #     "role": "assistant",
-        #     "thinking": "Need to call weather function.",
-        #     "tool_calls": [
-        #         {
-        #             "name": "get_weather",
-        #             "arguments": {
-        #                 "city": "Rio de Janeiro"
-        #             }
-        #         }
-        #     ],
-        #     "content": None
-        # }
-
-#     llm.parse_response("""
-# <|im_start|>user
-# <|im_start|>system
-# # Tools
-
-# You may call one or more functions to assist with the user query.
-
-# You are provided with function signatures within <tools></tools> XML tags:
-# <tools>
-# {"name": "fn_greet", "description": "Generate a greeting message for a person by name.", "parameters": {"name": {"type": "string"}}, "returns": {"type": "string"}}
-# </tools>
-
-# For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
-# <tool_call>
-# {"name": <function-name>, "arguments": <args-json-object>}
-# </tool_call><|im_end|>
-# <|im_start|>user
-# Me faça um elogio, meu nome é Gabriel Quaresma<|im_end|>
-# <|im_start|>assistant
-# <|im_end|>
-# <|im_start|>assistant
-# <think>
-# Okay, the user wants me to make a greeting. They mentioned their name is Gabriel Quaresma. Let me check the tools available. There's a function called fn_greet that takes a name parameter. I need to call that function with the name provided. I should format the tool call correctly in JSON inside the XML tags. Make sure the arguments are in JSON format and the name is a string. Alright, that should do it.
-# </think>
-
-# <tool_call>
-# {"name": "fn_greet", "arguments": {"name": "Gabriel Quaresma"}}
-# </tool_call><|im_end|>
-# """)
-
-    #print(formatted_text)
-
-    #print(llm.invoke(formatted_text))
-    # llm.invoke("Se meu nome é Gabriel Quaresma, qual seria meu nome primeiro nome?")
-    
-    # prompt formatado:
-    """
-    <|im_start|>system
-    # Tools
-
-    You may call one or more functions to assist with the user query.
-
-    You are provided with function signatures within <tools></tools> XML tags:
-    <tools>
-    {"name": "fn_greet", "description": "Generate a greeting message for a person by name.", "parameters": {"name": {"type": "string"}}, "returns": {"type": "string"}}
-    </tools>
-
-    For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
-    <tool_call>
-    {"name": <function-name>, "arguments": <args-json-object>}
-    </tool_call><|im_end|>
-    <|im_start|>user
-    Como está o tempo no Rio de Janeiro?<|im_end|>
-    <|im_start|>assistant
-    """
-
-    # sobre a formatação, o decode é a nivel de leitura para palabras, 
-    # então faz sentido limpar os tokens especiais. seria mais fácil splitar
-    # a resposta da LLM enquanto os tokens exisitirem, só capturar o token id de cada marcação e usar para separar
-    # 
-
-    # enquanto gera captar o estado 
-    # "nome da função e quando for selecionado um dos valores restritos
-    #  daí aplica o schema escolhido para os argumentos, conforme o estado da geração no DFA
+    print(llm.invoke("2 + 2 é quanto?"))
 
 
 if __name__ == "__main__":
     testes()
     # main()
     # raise SystemExit(main())
+
+
+# def testes() -> None:
+#     args = create_argument_parser().parse_args()   # primeira linha sempre
+#     print(args.functions_definition)
+#     print(args.input)
+#     print(args.output)
+#     print(args.model)
+#     llm = Model_with_Calling_Function(args.model)
+
+#     print(llm._tokenizer.chat_template)
+
+#     llm.bind_functions([
+#            {
+#                "name": "get_weather",
+#                "description": "Gets the current weather for a location.",
+#                "parameters": {
+#                    "location": {"type": "string"}
+#                },
+#                "returns": {
+#                    "type": "string"
+#                }
+#            }
+#        ])
+
+#     formatted_text = llm.format_prompt_to_calling_function(
+#         messages=[
+#             {
+#                 "role": "system",
+#                 "content": "You are a helpful assistant."
+#             },
+#             {
+#                 "role": "user",
+#                 "content": "What's the weather?"
+#             },
+#             {
+#                 "role": "assistant",
+#                 "think": "Need to call weather function.",
+#                 "tool_calls": [
+#                     {
+#                         "name": "get_weather",
+#                         "arguments": {
+#                             "city": "Rio de Janeiro"
+#                         }
+#                     }
+#                 ],
+#                 "content": None
+#             }
+#         ]
+#     )
+#     print(formatted_text)
+
+#     tokens_id = llm.encode(formatted_text).tolist()[0]
+
+#     messages = llm._parse_context(tokens_id)
+#     print("--------------- mensagens -------------------")
+#     for message in messages:
+#         print(message.model_dump())
+
+#     #print(llm.invoke(formatted_text))
+
+#         # {
+#         #     "role": "assistant",
+#         #     "thinking": "Need to call weather function.",
+#         #     "tool_calls": [
+#         #         {
+#         #             "name": "get_weather",
+#         #             "arguments": {
+#         #                 "city": "Rio de Janeiro"
+#         #             }
+#         #         }
+#         #     ],
+#         #     "content": None
+#         # }
+
+# #     llm.parse_response("""
+# # <|im_start|>user
+# # <|im_start|>system
+# # # Tools
+
+# # You may call one or more functions to assist with the user query.
+
+# # You are provided with function signatures within <tools></tools> XML tags:
+# # <tools>
+# # {"name": "fn_greet", "description": "Generate a greeting message for a person by name.", "parameters": {"name": {"type": "string"}}, "returns": {"type": "string"}}
+# # </tools>
+
+# # For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
+# # <tool_call>
+# # {"name": <function-name>, "arguments": <args-json-object>}
+# # </tool_call><|im_end|>
+# # <|im_start|>user
+# # Me faça um elogio, meu nome é Gabriel Quaresma<|im_end|>
+# # <|im_start|>assistant
+# # <|im_end|>
+# # <|im_start|>assistant
+# # <think>
+# # Okay, the user wants me to make a greeting. They mentioned their name is Gabriel Quaresma. Let me check the tools available. There's a function called fn_greet that takes a name parameter. I need to call that function with the name provided. I should format the tool call correctly in JSON inside the XML tags. Make sure the arguments are in JSON format and the name is a string. Alright, that should do it.
+# # </think>
+
+# # <tool_call>
+# # {"name": "fn_greet", "arguments": {"name": "Gabriel Quaresma"}}
+# # </tool_call><|im_end|>
+# # """)
+
+#     #print(formatted_text)
+
+#     #print(llm.invoke(formatted_text))
+#     # llm.invoke("Se meu nome é Gabriel Quaresma, qual seria meu nome primeiro nome?")
+    
+#     # prompt formatado:
+#     """
+#     <|im_start|>system
+#     # Tools
+
+#     You may call one or more functions to assist with the user query.
+
+#     You are provided with function signatures within <tools></tools> XML tags:
+#     <tools>
+#     {"name": "fn_greet", "description": "Generate a greeting message for a person by name.", "parameters": {"name": {"type": "string"}}, "returns": {"type": "string"}}
+#     </tools>
+
+#     For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
+#     <tool_call>
+#     {"name": <function-name>, "arguments": <args-json-object>}
+#     </tool_call><|im_end|>
+#     <|im_start|>user
+#     Como está o tempo no Rio de Janeiro?<|im_end|>
+#     <|im_start|>assistant
+#     """
+
+#     # sobre a formatação, o decode é a nivel de leitura para palabras, 
+#     # então faz sentido limpar os tokens especiais. seria mais fácil splitar
+#     # a resposta da LLM enquanto os tokens exisitirem, só capturar o token id de cada marcação e usar para separar
+#     # 
+
+#     # enquanto gera captar o estado 
+#     # "nome da função e quando for selecionado um dos valores restritos
+#     #  daí aplica o schema escolhido para os argumentos, conforme o estado da geração no DFA

@@ -7,6 +7,8 @@ TO-DO
 
 ChatML templat
 
+DFA = Deterministic Finite Automaton (Autômato Finito Determinístico).
+
 
 DONE
 - terminar leitura do subject
@@ -128,6 +130,24 @@ How many helicopters can a human eat in one sitting?</s>
 
 
 ---
+
+`generation_state`
+
+Representa algo como:
+```
+Estou dentro de um objeto JSON.
+A próxima coisa esperada é uma propriedade.
+A propriedade atual é "arguments".
+O nome da função já foi escolhido.
+A função é fn_add_numbers.
+Agora estou dentro dos argumentos.
+O próximo campo esperado é "a".
+O tipo de "a" é integer.
+```
+
+Isso não precisa conter os tokens inteiros do contexto.
+*Ele pode manter informações derivadas do contexto.*
+
 
 <|im_start|> e <|im_end|>, que estruturam as mensagens combinados com três papéis principais: system, user e assistant
 
