@@ -298,7 +298,7 @@ if __name__ == "__main__":
 #         #     "content": None
 #         # }
 
-# #     llm.parse_response("""
+# #     llm.parse_response(""" jinja4
 # # <|im_start|>user
 # # <|im_start|>system
 # # # Tools
@@ -317,6 +317,8 @@ if __name__ == "__main__":
 # # <|im_start|>user
 # # Me faça um elogio, meu nome é Gabriel Quaresma<|im_end|>
 # # <|im_start|>assistant
+
+
 # # <|im_end|>
 # # <|im_start|>assistant
 # # <think>

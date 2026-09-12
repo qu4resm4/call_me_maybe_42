@@ -463,7 +463,7 @@ Qual a cor do céu? [/INST] O céu é azul. </s><s>[INST] E à noite? [/INST]
 | Gemma | <start_of_turn>[role]\n | <end_of_turn>\n | Nativa (system) |
 | Mistral | [INST] | [/INST] | Embutida no primeiro [INST] |
 
-💡 Nota Importante: Para evitar quebrar a IA, nunca monte essas strings manualmente no seu código. Use sempre a função tokenizer.apply_chat_template(messages) da biblioteca Hugging Face Transformers. Ela lê o arquivo tokenizer_config.json do modelo específico e injeta as tags perfeitamente. [2, 5] 
+💡 Nota Importante: Para evitar quebrar a IA, nunca monte essas strings manualmente no seu código. Use sempre a função tokenizer.apply_chat_template(messages) da biblioteca Hugging Face Transformers. Ela lê o arquivo tokenizer_config.json do modelo específico e injeta as tags perfeitamente. [2, 5]
 
 Se você estiver desenvolvendo uma aplicação, me diga:
 

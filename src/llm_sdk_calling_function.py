@@ -42,8 +42,8 @@ class Model_with_Calling_Function(Small_LLM_Model):
         dtype: torch.dtype | None = None,
         trust_remote_code: bool = True,
         verbose_mode: bool = False,
-        token_selector: str = "greedy",  # or "sampling" #não faz sentido vou acabar tirando isso
-        token_restrictor: str = "dfa",  # or "trie" or "grammar" #não faz sentido vou acabar tirando isso
+        # token_selector: str = "greedy",  # or "sampling" #não faz sentido vou acabar tirando isso
+        # token_restrictor: str = "dfa",  # or "trie" or "grammar" #não faz sentido vou acabar tirando isso
         max_tokens: int = 20000    # vinte mil
     ) -> None:
         super().__init__(
@@ -52,8 +52,8 @@ class Model_with_Calling_Function(Small_LLM_Model):
                 dtype=dtype,
                 trust_remote_code=trust_remote_code
             )
-        self.token_selector = token_selector
-        self.token_restrictor = token_restrictor
+        # self.token_selector = token_selector
+        # self.token_restrictor = token_restrictor
         self.function_schemas: list[dict] = []
         self._max_tokens: int = max_tokens
         self.verbose_mode: bool = verbose_mode
@@ -256,6 +256,7 @@ class Model_with_Calling_Function(Small_LLM_Model):
         formatted_messages = [
             msg.model_dump(exclude_none=True) for msg in messages
         ]
+        self._tokenizer.response_parse()
         return_value = self._tokenizer.apply_chat_template(
             formatted_messages,
             tokenize=False,
@@ -312,7 +313,7 @@ class Model_with_Calling_Function(Small_LLM_Model):
                 ]
             )
         formatted_prompt = self.format_prompt_with_functions(prompt)    # já funciona e testado
-
+        
         input_ids = self.encode(formatted_prompt)
 
         context: list[int] = input_ids.tolist()[0]
@@ -348,64 +349,64 @@ class Model_with_Calling_Function(Small_LLM_Model):
         response = self._parse_context(context)    # já funciona e testado
         return response
 
-    @validate_call
-    def invoke_calling_function(
-        self,
-        prompt: str | list[ChatMessage]
-    ) -> list[ChatMessage]:
-        """;"""
-        if len(self.function_schemas) == 0:
-            msg = ("call_me_maybe: "
-                   "It is necessary to associate function schemas.\n")
-            raise Exception(msg)
+    # @validate_call
+    # def invoke_calling_function(
+    #     self,
+    #     prompt: str | list[ChatMessage]
+    # ) -> list[ChatMessage]:
+    #     """;"""
+    #     if len(self.function_schemas) == 0:
+    #         msg = ("call_me_maybe: "
+    #                "It is necessary to associate function schemas.\n")
+    #         raise Exception(msg)
 
-        if isinstance(prompt, str):
-            prompt = cast(
-                list[ChatMessage],
-                [
-                    UserMessage(
-                        role=ChatMLRole.USER,
-                        content=prompt
-                    )
-                ]
-            )
-        formatted_prompt = self.format_prompt_with_functions(prompt)    # já funciona e testado
+    #     if isinstance(prompt, str):
+    #         prompt = cast(
+    #             list[ChatMessage],
+    #             [
+    #                 UserMessage(
+    #                     role=ChatMLRole.USER,
+    #                     content=prompt
+    #                 )
+    #             ]
+    #         )
+    #     formatted_prompt = self.format_prompt_with_functions(prompt)    # já funciona e testado
 
-        input_ids = self.encode(formatted_prompt)
+    #     input_ids = self.encode(formatted_prompt)
 
-        context: list[int] = input_ids.tolist()[0]
-        initial_context_len = len(context)
-        if self.verbose_mode:
-            print(self.decode(context), end="", flush=True)
-        context = input_ids.tolist()[0]
-        state = GenerationState(
-            function_schemas=self.function_schemas,
-            tokenizer=self._tokenizer,
-        )
+    #     context: list[int] = input_ids.tolist()[0]
+    #     initial_context_len = len(context)
+    #     if self.verbose_mode:
+    #         print(self.decode(context), end="", flush=True)
+    #     context = input_ids.tolist()[0]
+    #     state = GenerationState(
+    #         function_schemas=self.function_schemas,
+    #         tokenizer=self._tokenizer,
+    #     )
 
-        while True:
-            logits = self.get_logits_from_input_ids(context)
-            restricted_logits = self.token_restrictor.restrict(
-                logits,
-                state,
-            )
-            next_token_id = self.token_selector.select(
-                restricted_logits
-            )
-            context.append(next_token_id)
-            state.consume(next_token_id)
-            if self.verbose_mode:
-                print(
-                    self.decode([next_token_id]),
-                    end="",
-                    flush=True
-                )
-            if state.is_finished():
-                break
-            if len(context) - initial_context_len >= self._max_tokens:
-                break
-        response = self._parse_context(context)
-        return response
+    #     while True:
+    #         logits = self.get_logits_from_input_ids(context)
+    #         restricted_logits = self.token_restrictor.restrict(
+    #             logits,
+    #             state,
+    #         )
+    #         next_token_id = self.token_selector.select(
+    #             restricted_logits
+    #         )
+    #         context.append(next_token_id)
+    #         state.consume(next_token_id)
+    #         if self.verbose_mode:
+    #             print(
+    #                 self.decode([next_token_id]),
+    #                 end="",
+    #                 flush=True
+    #             )
+    #         if state.is_finished():
+    #             break
+    #         if len(context) - initial_context_len >= self._max_tokens:
+    #             break
+    #     response = self._parse_context(context)
+    #     return response
 
     @validate_call
     def invoke(
