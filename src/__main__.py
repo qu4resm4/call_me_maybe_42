@@ -187,11 +187,16 @@ def main() -> int:
     print()
 
     json_responses = []
-    for json_prompt in prompts_input:
-        json_responses.append(llm.invoke_calling_function(json_prompt.prompt))
-        print("--------------- mensagens -------------------")
-        for message in messages:
-            print(message.model_dump())
+
+    messages = llm.invoke_calling_function(prompts_input[0].prompt)
+    print(messages.)
+
+    # for json_prompt in prompts_input:
+    #     messages = llm.invoke_calling_function(json_prompt.prompt)
+    #     json_responses.append(messages)
+    #     print("--------------- mensagens -------------------")
+    #     for message in messages:
+    #         print(message.model_dump())
 
         # definir tipo de retorno () geração em json, conversão para esquema
         # entrega em esquema
@@ -220,8 +225,8 @@ def testes() -> None:
 
 
 if __name__ == "__main__":
-    testes()
-    # main()
+    # testes()
+    main()
     # raise SystemExit(main())
 
 

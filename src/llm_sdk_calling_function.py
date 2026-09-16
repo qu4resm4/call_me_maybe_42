@@ -10,7 +10,7 @@
 #                                                                             #
 # ########################################################################### #
 
-from typing import cast
+from typing import cast, Any
 
 import re
 import json
@@ -29,6 +29,9 @@ from src.schemas import (
     UserMessage,
     ChatMessage
 )
+from src.constraints import GenerationState
+from src.token_restrictors import DFAConstrainedRestrictor
+from src.implementations import GreedySelector
 
 
 class Model_with_Calling_Function(Small_LLM_Model):
@@ -246,7 +249,7 @@ class Model_with_Calling_Function(Small_LLM_Model):
         function_schemas: list[FunctionDefinition]
     ) -> None:
         """."""
-        self.function_schemas.append(*[
+        self.function_schemas.extend([
             func.model_dump(exclude_none=True) for func in function_schemas
         ])
 
@@ -293,8 +296,8 @@ class Model_with_Calling_Function(Small_LLM_Model):
 
     @validate_call
     def invoke_calling_function(
-       self,
-       prompt: str | list[ChatMessage]
+        self,
+        prompt: str | list[ChatMessage]
     ) -> list[ChatMessage]:
         """;"""
         if len(self.function_schemas) == 0:
@@ -313,7 +316,7 @@ class Model_with_Calling_Function(Small_LLM_Model):
                 ]
             )
         formatted_prompt = self.format_prompt_with_functions(prompt)    # já funciona e testado
-        
+
         input_ids = self.encode(formatted_prompt)
 
         context: list[int] = input_ids.tolist()[0]
@@ -321,32 +324,42 @@ class Model_with_Calling_Function(Small_LLM_Model):
         if self.verbose_mode:
             print(self.decode(context), end="", flush=True)
 
-        stop_condition = False
-        while not stop_condition:
-            # Obtém a distribuição para o próximo token
+        state = GenerationState(
+            function_schemas=self.function_schemas,
+            tokenizer=self._tokenizer,
+        )
+        
+        restrictor = DFAConstrainedRestrictor(self._tokenizer)
+        selector = GreedySelector()
+
+        while True:
             logits = self.get_logits_from_input_ids(context)
-            next_token_id: int = 0
-            # como isso funcionaria internamente  e como os 3 componentes separariam a responsabilidade de cada e conversariam entre si?
-            logits = token_restrictor.restrict(
+            
+            restricted_logits = restrictor.restrict(
                 logits,
-                generation_state
+                state,
             )
-            next_token_id = token_selector.select(logits)    # faz sentido ser uma classe a parte pois guardaria que tipo de 
-            input_ids.append(next_token)    # sugestão desatualizada
-            generation_state.update(next_token)    # pra que isso seria util, não seria apenas manter a lista de tokens (context var) aqui no metodo?
-
+            next_token_id = selector.select(
+                restricted_logits
+            )
+            
+            context.append(next_token_id)
+            state.consume(next_token_id)
+            
             if self.verbose_mode:
-                print(self.decode([next_token_id]), end="", flush=True)
-
-            if generation_state.is_finished():    # como isso funcionaria?
+                print(
+                    self.decode([next_token_id]),
+                    end="",
+                    flush=True
+                )
+            if state.is_finished():
                 break
-            if (len(context) - initial_context_len) >= self._max_tokens:
+            if len(context) - initial_context_len >= self._max_tokens:
                 break
-            # Verifica se terminou
             if next_token_id == self._tokenizer.eos_token_id:
                 break
-
-        response = self._parse_context(context)    # já funciona e testado
+                
+        response = self._parse_context(context)
         return response
 
     # @validate_call
