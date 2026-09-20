@@ -39,9 +39,12 @@ endif
 # Variáveis para o comando que roda o projeto
 FUNCTIONS_DEFINITION = data/input/functions_definition.json
 DATA_INPUT = data/input/function_calling_tests.json
-DATA_OUTPUT = data/output/function_calls.json
-MODEL = Qwen/Qwen3-0.6B
-# MODEL = HuggingFaceTB/SmolLM2-360M-Instruct
+DATA_OUTPUT = data/output/function_calling_results.json
+# MODEL = Qwen/Qwen3-0.6B
+# MODEL = HuggingFaceTB/SmolLM2-360M-Instruct   # é um SLM então tem a acuracia baixissima
+# MODEL = google/gemma-3-1b-it   # acuracia baixa 6/11
+# MODEL = microsoft/Phi-3-mini-4k-instruct   # SLM horrivel também
+MODEL = NousResearch/Hermes-3-Llama-3.2-3B
 
 .PHONY: all install run run-no-install debug clean lint lint-strict check
 
@@ -106,9 +109,9 @@ else
 endif
 
 lint: install
-	-uv run mypy . --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
-	-uv run flake8 .
+	uv run mypy . --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
+	uv run flake8 .
 
 lint-strict: install
-	-uv run mypy . --strict
-	-uv run flake8 .
+	uv run mypy . --strict
+	uv run flake8 .

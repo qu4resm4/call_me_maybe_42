@@ -4,4 +4,5 @@ exclude =
     __pycache__,
     build,
     dist,
-    llm_sdk
+    llm_sdk,
+    moulinette

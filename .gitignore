@@ -5,3 +5,7 @@ __pycache__/
 .vscode/
 *.pyc
 dist/
+openspec/
+.gemini/
+.agents/
+data/output/
