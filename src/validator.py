@@ -1,31 +1,107 @@
+"""Validation of generated function calls against runtime definitions."""
+
+from typing import Any
+
+from pydantic import ValidationError
+
+from src.schemas import (
+    FunctionCallingResult,
+    FunctionDefinition,
+    ParameterType,
+)
 
 
-# Test with malformed input JSON
-# método para verificar se é um JSON válido 
-# sera reaproveitado na leitura do arquivo? no recebimento por 
-# parametro da class LLM será validado
+class ResultValidationError(ValueError):
+    """Raised when a generated function call violates its definition."""
 
 
-# Test with missing function definitions
-# verificar se foi atribuído funções
-# verificar se são funções válidas (schema padantic das funções)
+def _matches_type(value: Any, parameter_type: ParameterType) -> bool:
+    """Return whether ``value`` has the exact JSON-compatible type required."""
+    if parameter_type is ParameterType.INTEGER:
+        return isinstance(value, int) and not isinstance(value, bool)
+    if parameter_type is ParameterType.NUMBER:
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if parameter_type is ParameterType.STRING:
+        return isinstance(value, str)
+    if parameter_type is ParameterType.BOOLEAN:
+        return isinstance(value, bool)
+    if parameter_type is ParameterType.ARRAY:
+        return isinstance(value, list)
+    if parameter_type is ParameterType.OBJECT:
+        return isinstance(value, dict)
+    return False
 
 
-# Test with prompts that don't match any function
-# criar schema de função que dever ser chamada caso nenhuma corresponda
-# "missing_function" "sem parametros e sem retorno" lança erro?
-# ela pode ser sobreescrita (como no langchain)
+def validate_result(
+    result: FunctionCallingResult,
+    definitions: list[FunctionDefinition],
+) -> FunctionCallingResult:
+    """Validate a result against the selected function definition."""
+    definitions_by_name = {
+        definition.name: definition
+        for definition in definitions
+    }
+    definition = definitions_by_name.get(result.name)
+    if definition is None:
+        raise ResultValidationError(f"unknown function: {result.name}")
+
+    expected_names = set(definition.parameters)
+    actual_names = set(result.parameters)
+    missing = expected_names - actual_names
+    extra = actual_names - expected_names
+    if missing:
+        raise ResultValidationError(
+            f"function {result.name} is missing parameters: {sorted(missing)}"
+        )
+    if extra:
+        raise ResultValidationError(
+            f"function {result.name} has extra parameters: {sorted(extra)}"
+        )
+
+    for name, parameter in definition.parameters.items():
+        if not _matches_type(result.parameters[name], parameter.type):
+            actual_type = type(result.parameters[name]).__name__
+            raise ResultValidationError(
+                f"parameter {name} must be {parameter.type.value}, "
+                f"got {actual_type}"
+            )
+    return result
 
 
-# Verify clear error messages are provided
-# em quais casos tem que ter mensagem de erro??? chamar
-# 
-
-# Ensure the program never crashes unexpectedly
-# de lei
-
-
-# Does the program handle all error cases gracefully?
-# de lei
-
-
+def parse_and_validate_result(
+    raw: Any,
+    prompt: str,
+    definitions: list[FunctionDefinition],
+) -> FunctionCallingResult:
+    """Build and validate a result from model-produced JSON data."""
+    if isinstance(raw, dict):
+        raw = dict(raw)
+        selected_name = raw.get("name")
+        definition = next(
+            (
+                item
+                for item in definitions
+                if item.name == selected_name
+            ),
+            None,
+        )
+        if definition is not None:
+            parameters = dict(raw.get("parameters", {}))
+            for name, parameter in definition.parameters.items():
+                value = parameters.get(name)
+                if (
+                    parameter.type is ParameterType.NUMBER
+                    and isinstance(value, int)
+                    and not isinstance(value, bool)
+                ):
+                    parameters[name] = float(value)
+            raw["parameters"] = parameters
+    try:
+        result = FunctionCallingResult.model_validate(
+            {"prompt": prompt, **raw} if isinstance(raw, dict) else raw
+        )
+    except ValidationError as exc:
+        raise ResultValidationError(
+            f"invalid function-call object: {exc}"
+        ) from exc
+    return validate_result(result, definitions)

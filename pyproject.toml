@@ -3,14 +3,16 @@ name = "call-me-maybe"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "python-dotenv>=1.1.1",
     "flake8>=7.3.0",
     "llm-sdk",
     "mypy>=2.1.0",
     "pydantic>=2.13.4",
+    "torch>=2.0.0",
 ]
 
 [tool.mypy]
-exclude = "^(\\.venv|build|dist|llm_sdk)/"
+exclude = "^(\\.venv|build|dist|llm_sdk|moulinette)/"
 
 [tool.uv.workspace]
 members = [

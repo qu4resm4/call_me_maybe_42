@@ -1,112 +1,33 @@
-# ########################################################################### #
-#   shebang: 0                                                                #
-#                                                          :::      ::::::::  #
-#   __main__.py                                          :+:      :+:    :+:  #
-#                                                      +:+ +:+         +:+    #
-#   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
-#                                                  +#+#+#+#+#+   +#+          #
-#   Created: 2026/06/16 15:50:25 by gquaresm            #+#    #+#            #
-#   Updated: 2026/08/03 19:20:09 by gquaresm           ###   ########.fr      #
-#                                                                             #
-# ########################################################################### #
+"""Command-line entry point for the function-calling pipeline."""
 
-import json
-import sys
 import importlib
+import sys
+from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from importlib.metadata import PackageNotFoundError
 from pathlib import Path
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from src.llm_sdk_calling_function import Model_with_Calling_Function
-from src.schemas import ChatMessage, FunctionDefinition, PromptInput
 
+from dotenv import load_dotenv
 
-def print_execution_help() -> None:
-    """
-    Print execution instructions for setting up and running the project.
+load_dotenv()
 
-    Displays the recommended commands for running the application using
-    either ``uv`` or a standard Python virtual environment with ``pip``.
-    """
-    project_root = Path(__file__).resolve().parent.parent
-    print("=== HOW RUN THE PROJECT ===\n")
-    print(f"  cd {project_root}\n")
-    print("Recommended method (uv required):")
-    print("  make install")
-    print("  make run\n")
-    print("  or\n")
-    print("  uv sync")
-    print("  uv run python -m src "
-          "[--functions_definition <function_definition_file>] "
-          "[--input <input_file>] "
-          "[--output <output_file>]")
-    print("\nAlternative method (venv and pip required):")
-    print("  python -m venv .venv")
-    print("  source .venv/bin/activate")
-    print("  pip install -r requirements.txt")
-    print("  pip install -e ./llm_sdk")
-    print("  python -m src "
-          "[--functions_definition <function_definition_file>] "
-          "[--input <input_file>] "
-          "[--output <output_file>]")
-    print("\nDefault args values:"
-          "\n--functions_definition data/input/functions_definition.json"
-          "\n--input data/input/function_calling_tests.json"
-          "\n--output data/output/function_calls.json\n")
-
-
-def check_dependencies() -> None:
-    """
-    Verify that all required project dependencies are available.
-
-    Attempts to import each required package before the application starts.
-    If any dependency is missing, prints a dependency report, displays
-    troubleshooting information when appropriate, shows execution
-    instructions, and terminates the program with a non-zero exit code.
-    """
-    REQUIRED = [
-        ("numpy", "Numerical computation"),
-        ("pydantic", "Data validation"),
-        ("llm_sdk", "LLM inference wrapper"),
-    ]
-    check_available: dict[str, tuple[bool, str]] = {}
-    pkg_msg: str = ""
-    for pkg, description in REQUIRED:
-        try:
-            importlib.import_module(pkg)
-            check_available[pkg] = (True, "")
-            pkg_msg += (f"[OK] {pkg} - {description} installed\n")
-        except (ImportError, PackageNotFoundError) as exc:
-            pkg_msg += (f"[MISSING] {pkg} - {description} not installed\n")
-            check_available[pkg] = (False, exc.msg)
-    for pkg, available in check_available.items():
-        if not available[0]:
-            print(pkg_msg)
-            if not check_available["llm_sdk"][0]:
-                print(f"Details: {check_available["llm_sdk"][1]}")
-                print(
-                    "\nPossible causes:\n"
-                    "- uv sync was not executed\n"
-                    "- llm_sdk was not installed as a local dependency\n"
-                    "- incorrect virtual environment\n"
-                    "- execution outside the project environment\n"
-                )
-            print_execution_help()
-            sys.exit(1)
+from src.io_utils import (  # noqa: E402
+    InputFileError,
+    load_model_list,
+    write_json,
+)
+from src.llm_sdk_calling_function import (  # noqa: E402
+    GenerationError,
+    Model_with_Calling_Function,
+)  # noqa: E402
+from src.schemas import FunctionDefinition, PromptInput  # noqa: E402
 
 
 def create_argument_parser() -> ArgumentParser:
-    """
-    Create and configure the application's command-line argument parser.
-
-    Returns:
-        ArgumentParser: A configured parser containing all supported
-            command-line options and their default values.
-    """
+    """Create the command-line argument parser."""
     parser = ArgumentParser(
         prog="call_me_maybe",
         description=(
-            "Execute the function calling pipeline using the provided "
-            "function definitions and input dataset."
+            "Generate validated function calls from natural-language prompts."
         ),
         formatter_class=ArgumentDefaultsHelpFormatter,
     )
@@ -117,247 +38,79 @@ def create_argument_parser() -> ArgumentParser:
         type=Path,
         default=Path("data/input/functions_definition.json"),
         metavar="FILE",
-        help="Path to the JSON file containing the function definitions.",
+        help="JSON file containing function definitions.",
     )
     parser.add_argument(
         "--input",
         type=Path,
         default=Path("data/input/function_calling_tests.json"),
         metavar="FILE",
-        help="Path to the input JSON file containing the test prompts.",
+        help="JSON file containing prompt objects.",
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("data/output/function_calls.json"),
+        default=Path("data/output/function_calling_results.json"),
         metavar="FILE",
-        help="Path where the generated function calls will be written.",
+        help="Output JSON path.",
     )
     parser.add_argument(
         "--model",
-        type=str,
         default="Qwen/Qwen3-0.6B",
         metavar="MODEL",
-        help="Model identifier used to execute the inference.",
+        help="Model identifier used for inference.",
     )
     return parser
 
 
+def check_dependencies() -> None:
+    """Raise a clear error when a required package is not installed."""
+    required = ("numpy", "pydantic", "llm_sdk")
+    missing: list[str] = []
+    for package in required:
+        try:
+            importlib.import_module(package)
+        except (ImportError, PackageNotFoundError):
+            missing.append(package)
+    if missing:
+        raise InputFileError(
+            "missing dependencies: " + ", ".join(missing) + ". Run `uv sync`."
+        )
+
+
 def main() -> int:
-    args = create_argument_parser().parse_args()   # primeira linha sempre
-    check_dependencies()    # segunda linha antes da execução do PIPELINE
-    print(args.functions_definition)
-    print(args.input)
-    print(args.output)
-    print(args.model)
-
-    function_schemas = []
-    prompts_input = []
-
+    """Run the complete input, generation, validation, and output pipeline."""
+    args = create_argument_parser().parse_args()
     try:
-        with open(args.functions_definition) as f:
-            function_schemas = [
-                FunctionDefinition.model_validate(item)
-                for item in json.load(f)
-            ]
-            # function_schemas = json.load(f)
-        with open(args.input) as f:
-            prompts_input = [
-                PromptInput.model_validate(item)
-                for item in json.load(f)
-            ]
-            # prompts_input = json.load(f)
-    except Exception as err:
-        print("call_me_maybe: error reading the files")
-        if isinstance(err, TypeError):
-            print("call_me_maybe: Invalid schema, "
-                  "must be JSON-compatible\n", err)
-            print("call_me_maybe: TypeError\n\n", err)
-        sys.exit(1)
-
-    llm = Model_with_Calling_Function(args.model)
-
-    llm.bind_functions(function_schemas)
-
-    json_responses = []
-    for json_prompt in prompts_input:
-        json_responses.append(llm.invoke_calling_function(json_prompt.prompt))
-        # definir tipo de retorno () geração em json, conversão para esquema
-        # entrega em esquema
-        # conversão para json para escrita no arquivo após
-
-    # Small_LLM_Model = import_or_exit()
-    # model: Small_LLM_Model = Small_LLM_Model()
-    # print(model)
-    # print("vocab: ", model.get_path_to_vocab_file())
-    # print("merges: ", model.get_path_to_merges_file())
-    # print("tokenizer: ", model.get_path_to_tokenizer_file())
-
-    # fazer loading dos arquivos
+        check_dependencies()
+        definitions = load_model_list(
+            args.functions_definition,
+            FunctionDefinition,
+        )
+        prompts = load_model_list(args.input, PromptInput)
+        trust_remote_code = args.model != "microsoft/Phi-3-mini-4k-instruct"
+        model = Model_with_Calling_Function(
+            args.model,
+            verbose=True,
+            trust_remote_code=trust_remote_code,
+        )
+        model.bind_functions(definitions)
+        results = [
+            model.invoke_calling_function(item.prompt) for item in prompts
+        ]
+        write_json(
+            args.output,
+            [result.model_dump(mode="json") for result in results],
+        )
+    except (InputFileError, GenerationError, ValueError, OSError) as exc:
+        print(f"call_me_maybe: error: {exc}", file=sys.stderr)
+        return 1
+    except Exception as exc:  # pragma: no cover - final CLI safety boundary
+        print(f"call_me_maybe: unexpected error: {exc}", file=sys.stderr)
+        return 1
+    print(f"call_me_maybe: wrote {len(results)} results to {args.output}")
     return 0
 
 
-def testes() -> None:
-    args = create_argument_parser().parse_args()   # primeira linha sempre
-    print(args.functions_definition)
-    print(args.input)
-    print(args.output)
-    print(args.model)
-    llm = Model_with_Calling_Function(args.model)
-
-    print(llm._tokenizer.chat_template)
-
-    # print(llm.format_prompt([
-    #     ChatMessage.model_validate({
-    #         "role": "system",
-    #         "content": "You are a friendly chatbot who always responds in the style of a pirate"
-    #     }),
-    #     ChatMessage.model_validate({
-    #         "role": "user",
-    #         "content": "How many helicopters can a human eat in one sitting?"
-    #     })
-    # ]))
-
-    # def get_weather(location: str) -> str:
-    #    """Gets the current weather for a location.
-
-    #    Args:
-    #        location: City and state, e.g. San Francisco, CA
-    #    """
-    #    return "22°C"
-
-    llm.bind_functions([
-           {
-               "name": "get_weather",
-               "description": "Gets the current weather for a location.",
-               "parameters": {
-                   "location": {"type": "string"}
-               },
-               "returns": {
-                   "type": "string"
-               }
-           }
-       ])
-
-    formatted_text = llm.format_prompt_to_calling_function(
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a helpful assistant."
-            },
-            {
-                "role": "user",
-                "content": "What's the weather?"
-            },
-            {
-                "role": "assistant",
-                "think": "Need to call weather function.",
-                "tool_calls": [
-                    {
-                        "name": "get_weather",
-                        "arguments": {
-                            "city": "Rio de Janeiro"
-                        }
-                    }
-                ],
-                "content": None
-            }
-        ]
-    )
-    print(formatted_text)
-
-    tokens_id = llm.encode(formatted_text).tolist()[0]
-
-    messages = llm._parse_context(tokens_id)
-    
-    print("--------------- mensagens -------------------")
-    for message in messages:
-        print(message.model_dump())
-
-    #print(llm.invoke(formatted_text))
-
-    
-        # {
-        #     "role": "assistant",
-        #     "thinking": "Need to call weather function.",
-        #     "tool_calls": [
-        #         {
-        #             "name": "get_weather",
-        #             "arguments": {
-        #                 "city": "Rio de Janeiro"
-        #             }
-        #         }
-        #     ],
-        #     "content": None
-        # }
-
-#     llm.parse_response("""
-# <|im_start|>user
-# <|im_start|>system
-# # Tools
-
-# You may call one or more functions to assist with the user query.
-
-# You are provided with function signatures within <tools></tools> XML tags:
-# <tools>
-# {"name": "fn_greet", "description": "Generate a greeting message for a person by name.", "parameters": {"name": {"type": "string"}}, "returns": {"type": "string"}}
-# </tools>
-
-# For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
-# <tool_call>
-# {"name": <function-name>, "arguments": <args-json-object>}
-# </tool_call><|im_end|>
-# <|im_start|>user
-# Me faça um elogio, meu nome é Gabriel Quaresma<|im_end|>
-# <|im_start|>assistant
-# <|im_end|>
-# <|im_start|>assistant
-# <think>
-# Okay, the user wants me to make a greeting. They mentioned their name is Gabriel Quaresma. Let me check the tools available. There's a function called fn_greet that takes a name parameter. I need to call that function with the name provided. I should format the tool call correctly in JSON inside the XML tags. Make sure the arguments are in JSON format and the name is a string. Alright, that should do it.
-# </think>
-
-# <tool_call>
-# {"name": "fn_greet", "arguments": {"name": "Gabriel Quaresma"}}
-# </tool_call><|im_end|>
-# """)
-
-    #print(formatted_text)
-
-    #print(llm.invoke(formatted_text))
-    # llm.invoke("Se meu nome é Gabriel Quaresma, qual seria meu nome primeiro nome?")
-    
-    # prompt formatado:
-    """
-    <|im_start|>system
-    # Tools
-
-    You may call one or more functions to assist with the user query.
-
-    You are provided with function signatures within <tools></tools> XML tags:
-    <tools>
-    {"name": "fn_greet", "description": "Generate a greeting message for a person by name.", "parameters": {"name": {"type": "string"}}, "returns": {"type": "string"}}
-    </tools>
-
-    For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
-    <tool_call>
-    {"name": <function-name>, "arguments": <args-json-object>}
-    </tool_call><|im_end|>
-    <|im_start|>user
-    Como está o tempo no Rio de Janeiro?<|im_end|>
-    <|im_start|>assistant
-    """
-
-    # sobre a formatação, o decode é a nivel de leitura para palabras, 
-    # então faz sentido limpar os tokens especiais. seria mais fácil splitar
-    # a resposta da LLM enquanto os tokens exisitirem, só capturar o token id de cada marcação e usar para separar
-    # 
-
-    # enquanto gera captar o estado 
-    # "nome da função e quando for selecionado um dos valores restritos
-    #  daí aplica o schema escolhido para os argumentos, conforme o estado da geração no DFA
-
-
 if __name__ == "__main__":
-    testes()
-    # main()
-    # raise SystemExit(main())
+    raise SystemExit(main())

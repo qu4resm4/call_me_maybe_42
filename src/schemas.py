@@ -13,7 +13,7 @@
 from enum import StrEnum
 from numbers import Number
 from typing import Literal, TypeAlias, Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # -----------------------------------------------------------------------------
 #
@@ -47,20 +47,33 @@ class ParameterInfo(BaseModel):
 
 
 class FunctionDefinition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     description: str
     parameters: dict[str, ParameterInfo]
     returns: ParameterInfo
 
+    @field_validator("name")
+    @classmethod
+    def name_must_not_be_empty(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("function name must not be empty")
+        return value
+
 
 class PromptInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     prompt: str
 
 
 class FunctionCallingResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     prompt: str
     name: str
-    parameters: dict[str, ParameterInfo]
+    parameters: dict[str, Any]
 
 # -----------------------------------------------------------------------------
 #

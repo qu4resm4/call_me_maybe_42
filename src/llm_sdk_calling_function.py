@@ -1,38 +1,31 @@
-# ########################################################################### #
-#   shebang: 0                                                                #
-#                                                          :::      ::::::::  #
-#   llm_sdk_calling_function.py                          :+:      :+:    :+:  #
-#                                                      +:+ +:+         +:+    #
-#   By: gquaresm <gquaresm@student.42.rio>           +#+  +:+       +#+       #
-#                                                  +#+#+#+#+#+   +#+          #
-#   Created: 2026/07/20 22:35:54 by gquaresm            #+#    #+#            #
-#   Updated: 2026/08/03 19:28:38 by gquaresm           ###   ########.fr      #
-#                                                                             #
-# ########################################################################### #
+"""Function-calling model wrapper with constrained JSON generation."""
 
-# from typing import Any, cast
-
-import re
 import json
+from typing import Any
 
 from pydantic import ConfigDict, validate_call
+import torch
 
-from llm_sdk import Small_LLM_Model, torch    # type: ignore[attr-defined]
+from llm_sdk import Small_LLM_Model
 
+from src.grammar import FunctionCallGrammar
 from src.schemas import (
-    AssistantMessage,
-    ChatMLRole,
+    FunctionCallingResult,
     FunctionDefinition,
+    ChatMLRole,
     SystemMessage,
-    ToolCall,
-    ToolMessage,
     UserMessage,
-    ChatMessage,
-    ChatMLTemplate
 )
+from src.strategies import GreedyTokenSelector
+from src.validator import parse_and_validate_result
+
+
+class GenerationError(RuntimeError):
+    """Raised when constrained generation cannot complete a function call."""
 
 
 class Model_with_Calling_Function(Small_LLM_Model):
+    """Generate validated function calls with a local causal language model."""
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def __init__(
@@ -42,490 +35,129 @@ class Model_with_Calling_Function(Small_LLM_Model):
         device: str | None = None,
         dtype: torch.dtype | None = None,
         trust_remote_code: bool = True,
-        token_selector: str = "greedy",  # or "sampling"
-        token_restrictor: str = "dfa",  # or "trie" or "grammar"
+        token_selector: str = "greedy",
+        max_tokens: int = 512,
+        verbose: bool = True,
     ) -> None:
         super().__init__(
-                model_name,
-                device=device,
-                dtype=dtype,
-                trust_remote_code=trust_remote_code
-            )
-        self.token_selector = token_selector
-        self.token_restrictor = token_restrictor
-        self.function_schemas: list[dict] = []
-        self._max_tokens: int = 20000    # vinte mil
-
-        start, end = self.__discover_message_delimiters()
-        self.message_start_str: str = start
-        self.message_end_str: str = end
-        self.message_start_token: int = self.encode(start).tolist()[0][0]
-        self.message_end_token: int = self.encode(end).tolist()[0][0]
-        # print(f"start: {start}, end: {end}")
-        # print("message_start_token: ", self.message_start_token)
-        # print("message_end_token: ", self.message_end_token)
-
-    @validate_call
-    def __discover_message_delimiters(self) -> tuple[str, str]:
-        sentinel = "__CALL_ME_MAYBE_SENTINEL__"
-        rendered = self._tokenizer.apply_chat_template(
-            [
-                {
-                    "role": ChatMLRole.USER.value,
-                    "content": sentinel,
-                }
-            ],
-            tokenize=False,
-            add_generation_prompt=False,
+            model_name,
+            device=device,
+            dtype=dtype,
+            trust_remote_code=trust_remote_code,
         )
-        role = ChatMLRole.USER.value
-        if isinstance(rendered, str):
-            role_index = rendered.index(role)
-            sentinel_index = rendered.index(sentinel)
-
-            return (
-                    rendered[:role_index],
-                    rendered[sentinel_index + len(sentinel):].strip()
-                )
-        return ("", "")
-
-    @validate_call
-    def _split_context(
-        self,
-        context: list[int],
-    ) -> list[list[int]]:
-        """
-        Recebe uma sequência completa de token_ids (histórico do chat) e separa
-        cada mensagem individual utilizando os tokens especiais de início e fim
-        descobertos durante a inicialização.
-
-        Exemplo de entrada:
-
-        [
-            151644, ..., 151645,
-            151644, ..., 151645,
-            151644, ..., 151645,
-        ]
-
-        Retorno:
-
-        [
-            [151644, ..., 151645],
-            [151644, ..., 151645],
-            [151644, ..., 151645],
-        ]
-        """
-
-        messages: list[list[int]] = []
-        current_message: list[int] = []
-        inside_message = False
-        for token in context:
-            # Encontrou o início de uma nova mensagem.
-            # Caso uma mensagem anterior tenha ficado incompleta,
-            # ela é descartada e iniciamos uma nova.
-            if token == self.message_start_token:
-                current_message = [token]
-                inside_message = True
-                continue
-            # Enquanto estivermos dentro de uma mensagem,
-            # acumulamos todos os tokens exatamente como foram
-            # produzidos pelo modelo/tokenizer.
-            if inside_message:
-                current_message.append(token)
-                # Ao encontrar o delimitador de fim,
-                # armazenamos a mensagem completa e
-                # voltamos ao estado "fora de mensagem".
-                if token == self.message_end_token:
-                    messages.append(current_message)
-                    current_message = []
-                    inside_message = False
-        return messages
-
-    @validate_call
-    def _parse_context(
-        self,
-        context: list[int],
-    ) -> list[ChatMessage]:
-        messages = self._split_context(context)
-        parsed_messages: list[ChatMessage] = []
-
-        for message_tokens in messages:
-            text = self.decode(message_tokens).strip()
-
-            if not text:
-                continue
-            role, body = text.split(maxsplit=1)
-            role = ChatMLRole(role)
-
-            if role is ChatMLRole.SYSTEM:
-                parsed_messages.append(
-                    SystemMessage(
-                        role=role,
-                        content=body.strip(),
-                    )
-                )
-
-            elif role is ChatMLRole.USER:
-                parsed_messages.append(
-                    UserMessage(
-                        role=role,
-                        content=body.strip(),
-                    )
-                )
-
-            elif role is ChatMLRole.TOOL:
-                parsed_messages.append(
-                    ToolMessage(
-                        role=role,
-                        content=body.strip(),
-                    )
-                )
-
-            elif role is ChatMLRole.ASSISTANT:
-                think: str | None = None
-                tool_calls: list[ToolCall] = []
-                think_match = re.search(
-                    r"<think>(.*?)</think>",
-                    body,
-                    flags=re.DOTALL,
-                )
-
-                if think_match:
-                    think = think_match.group(1).strip()
-                    body = (
-                        body[:think_match.start()]
-                        + body[think_match.end():]
-                    )
-
-                for tool_match in re.finditer(
-                    r"<tool_call>(.*?)</tool_call>",
-                    body,
-                    flags=re.DOTALL,
-                ):
-
-                    tool_json = tool_match.group(1).strip()
-
-                    data = json.loads(tool_json)
-
-                    tool_calls.append(
-                        ToolCall.model_validate(data)
-                    )
-
-                body = re.sub(
-                    r"<tool_call>.*?</tool_call>",
-                    "",
-                    body,
-                    flags=re.DOTALL,
-                ).strip()
-
-                parsed_messages.append(
-                    AssistantMessage(
-                        role=role,
-                        think=think,
-                        tool_calls=tool_calls,
-                        content=body if body else None,
-                    )
-                )
-
-        return parsed_messages
+        if token_selector != "greedy":
+            raise ValueError("only the greedy token selector is supported")
+        self._selector = GreedyTokenSelector()
+        self._max_tokens = max_tokens
+        self.verbose = verbose
+        self.function_schemas: list[FunctionDefinition] = []
+        self._vocabulary: dict[int, str] | None = None
 
     @validate_call
     def bind_functions(
         self,
-        function_schemas: list[FunctionDefinition]
+        function_schemas: list[FunctionDefinition],
     ) -> None:
-        """."""
-        self.function_schemas.append(*[
-            func.model_dump(exclude_none=True) for func in function_schemas
-        ])
+        """Replace the available function definitions for future calls."""
+        if not function_schemas:
+            raise ValueError("at least one function definition is required")
+        names = [function.name for function in function_schemas]
+        if len(names) != len(set(names)):
+            raise ValueError("function names must be unique")
+        self.function_schemas = list(function_schemas)
+        if self.verbose:
+            print(f"[call_me_maybe] bound {len(names)} function definitions")
 
-    @validate_call
-    def format_prompt(self, messages: list[ChatMLTemplate]) -> str:
-        """."""
-        formatted_messages = [
-            msg.model_dump(exclude_none=True) for msg in messages
+    def format_prompt_to_calling_function(self, prompt: str) -> str:
+        """Render a model-independent prompt with available definitions."""
+        if not self.function_schemas:
+            raise ValueError("bind_functions must be called before generation")
+        definitions = [
+            schema.model_dump(mode="json")
+            for schema in self.function_schemas
         ]
-        return_value = self._tokenizer.apply_chat_template(
-            formatted_messages,
-            tokenize=False,
-            add_generation_prompt=True
+        system = (
+            "You are a function calling router. Choose the function that best "
+            "matches the user's request. Return only one JSON object with "
+            "exactly the keys name and parameters. Do not return markdown or "
+            "explanations. Copy string arguments exactly from the user request"
+            " without adding characters. Regex arguments must be raw regex "
+            "patterns without slash delimiters or flags. "
+            "The available functions are:\n"
+            f"{json.dumps(definitions, ensure_ascii=False)}"
         )
-        if isinstance(return_value, str):
-            return return_value
-        return ""
-
-    @validate_call
-    def format_prompt_to_calling_function(
-        self,
-        messages: list[ChatMessage]
-    ) -> str:
-        """."""
-        if len(self.function_schemas) == 0:
-            msg = ("call_me_maybe: "
-                   "It is necessary to associate function schemas.\n")
-            raise Exception(msg)
-        # Converter os modelos Pydantic de volta para dicts para o transformers
-        formatted_messages = [
-            msg.model_dump(exclude_none=True) for msg in messages
+        messages = [
+            SystemMessage(role=ChatMLRole.SYSTEM, content=system).model_dump(),
+            UserMessage(role=ChatMLRole.USER, content=prompt).model_dump(),
         ]
-        return_value = self._tokenizer.apply_chat_template(
-            formatted_messages,
-            tools=[*self.function_schemas],
-            tokenize=False,
-            add_generation_prompt=True
-        )
-        return return_value
+        return self.apply_chat_template(messages)
 
-    @validate_call
-    def parse_response(
-        self,
-        response: str
-    ) -> list[dict[str, str]]:
-        """ reverso do apply_chat_template que usa os otkens especificos
-         do modelo que delimita cada coisa"""
-        schema = ChatMLTemplate.model_json_schema()
-        r_value = self._tokenizer.parse_response(response, schema)
-        #r_value = self._tokenizer.parse_response(response)
-        # Normalize returned value to list[dict[str, str]] for Pylance e Mypy
-        print("r_value fdp:", r_value)
-        return r_value
+    def _get_vocabulary(self) -> dict[int, str]:
+        """Load and cache decoded vocabulary token text."""
+        if self._vocabulary is None:
+            self._vocabulary = self.get_vocabulary()
+        return self._vocabulary
 
+    def invoke_calling_function(self, prompt: str) -> FunctionCallingResult:
+        """Generate and validate one function call for ``prompt``."""
+        if not self.function_schemas:
+            raise GenerationError("no function definitions have been bound")
+        grammar = FunctionCallGrammar(self.function_schemas)
+        formatted_prompt = self.format_prompt_to_calling_function(prompt)
+        if self.verbose:
+            print(
+                f"\n\n\n[call_me_maybe] context: {formatted_prompt}",
+                end="",
+                flush=True
+            )
+        input_ids = self.encode(formatted_prompt).tolist()[0]
+        generated_ids: list[int] = []
+        generated_text = ""
+        vocabulary = self._get_vocabulary()
+        special_token_ids = self.get_special_token_ids()
 
-# import re
-# from transformers import AutoTokenizer
-
-# def parse_response_dynamically(response_text: str, tokenizer: AutoTokenizer) -> list[dict]:
-#     """
-#     Tenta decodificar o texto de qualquer LLM lendo seus atributos de chat e tokens nativos.
-#     """
-#     # 1. Tenta usar o recurso nativo de parsing do transformers (se o modelo já suportar)
-#     if getattr(tokenizer, "response_schema", None) is not None:
-#         try:
-#             return tokenizer.parse_response(response_text)
-#         except Exception:
-#             pass
-
-#     # 2. Descobre tokens especiais diretamente do tokenizer do modelo
-#     special_tokens = list(tokenizer.all_special_tokens)
-    
-#     # 3. Detecta os marcadores de role inspecionando o Jinja Chat Template
-#     chat_template = getattr(tokenizer, "chat_template", "") or ""
-    
-#     # Padrão ChatML (<|im_start|>, <|im_end|>)
-#     if "<|im_start|>" in chat_template or "<|im_start|>" in special_tokens:
-#         pattern = r"<\|im_start\|>(\w+)\n?(.*?)(?=<\|im_end\|>|$)"
-#         matches = re.findall(pattern, response_text, re.DOTALL)
-#         if matches:
-#             return [{"role": role.strip(), "content": content.strip()} for role, content in matches]
-
-#     # Padrão Llama 3 / Qwen 2.5 (<|start_header_id|> user <|end_header_id|>)
-#     if "<|start_header_id|>" in chat_template or "<|start_header_id|>" in special_tokens:
-#         pattern = r"<\|start_header_id\|>(\w+)<\|end_header_id\|>\n\n(.*?)(?=<\|eot_id\|>|<|start_header_id\|>|$)"
-#         matches = re.findall(pattern, response_text, re.DOTALL)
-#         if matches:
-#             return [{"role": role.strip(), "content": content.strip()} for role, content in matches]
-
-#     # Padrão Mistral / Llama 2 ([INST] ... [/INST])
-#     if "[INST]" in chat_template or "[INST]" in special_tokens:
-#         # Mistral não marca claramente a resposta do assistente com tags específicas,
-#         # ela fica apenas fora do [INST]
-#         clean_text = re.sub(r"\[INST\].*?\[/INST\]", "", response_text, flags=re.DOTALL).strip()
-#         # Remove EOS tokens do modelo
-#         for eos in [tokenizer.eos_token, "</s>"]:
-#             if eos:
-#                 clean_text = clean_text.replace(eos, "").strip()
-#         return [{"role": "assistant", "content": clean_text}]
-
-#     # Fallback genérico: Limpa tokens de fim de texto (EOS/PAD) e assume que é a resposta do assistente
-#     clean_text = response_text
-#     for token in tokenizer.all_special_tokens:
-#         clean_text = clean_text.replace(token, "")
-    
-#     return [{"role": "assistant", "content": clean_text.strip()}]
-
-
-    # @validate_call
-    # def invoke_calling_function(
-    #    self,
-    #    prompt: str
-    # ) -> Any:
-    #     """;"""
-    #     if len(self.function_schemas) == 0:
-    #         msg = ("call_me_maybe: "
-    #                "It is necessary to associate function schemas.\n")
-    #         raise Exception(msg)
-
-    #     input_ids = self.encode(prompt)
-        
-    #     context: list[int] = input_ids.tolist()[0]
-        
-    #     print("primeiro contexto: ", context)
-    #     print("tipo contexto: ", type(context))
-
-    #     stop_condition = False
-    #     while not stop_condition:
-    #         logits = self.get_logits_from_input_ids(input_ids)
-    #         logits = token_restrictor.restrict(
-    #             logits,
-    #             generation_state
-    #         )
-    #         next_token = token_selector.select(logits)
-    #         input_ids.append(next_token)
-    #         generation_state.update(next_token)
-    #         if next_token == eos_token:
-    #             break
-    #         if generation_state.is_finished():
-    #             break
-    #         if len(generated) >= self._max_tokens:
-    #             break
-            
-    #     token_str = self.decode(context)
-    #     response = self.parse_response(token_str)
-    #     # pegar a última mensagem de assistant?
-    #     return response
-
-    @validate_call
-    def invoke(
-        self,
-        prompt: str | list[ChatMLTemplate]
-    ) -> str:
-        """."""
-        # Tokeniza o prompt
-        import os
-
-        if isinstance(prompt, str):
-            prompt = [
-                ChatMLTemplate(
-                    role=ChatMLRole.USER.value,
-                    content=prompt
-                )
-            ]
-        formatted_prompt = self.format_prompt(prompt)
-
-        input_ids = self.encode(formatted_prompt)
-
-        context: list[int] = input_ids.tolist()[0]
-
-        while True:
-            # Obtém a distribuição para o próximo token
-            logits = self.get_logits_from_input_ids(context)
-
-            os.system('cls' if os.name == 'nt' else 'clear')
-            print("contexto atual: ", self.decode(context))
-
-            # Escolhe um token (Greedy, por enquanto)
-            # next_token = max(logits)   # argmax(logits)
-            next_token_id: int = 0
-            max_logit = logits[0]
-            for token_id, logit in enumerate(logits):
-                if max_logit < logit:
-                    max_logit = logit
-                    next_token_id = token_id
-
-            # Acrescenta o token ao contexto
-            context.append(next_token_id)
-
-            # Verifica se terminou
-            if next_token_id == self._tokenizer.eos_token_id:
+        for _ in range(self._max_tokens):
+            if grammar.is_complete(generated_text):
                 break
+            logits = self.get_logits_from_input_ids(input_ids + generated_ids)
+            try:
+                token_id, checked = self._selector.select_valid(
+                    logits,
+                    vocabulary,
+                    generated_text,
+                    grammar.is_valid_prefix,
+                    special_token_ids,
+                )
+            except ValueError as exc:
+                raise GenerationError(
+                    "no valid token remains after generated prefix: "
+                    f"{generated_text!r}"
+                ) from exc
+            token_text = vocabulary[token_id]
+            generated_ids.append(token_id)
+            generated_text += token_text
+            if self.verbose:
+                print(
+                    token_text,
+                    end="",
+                    flush=True
+                )
 
-        # token_str = self.decode(context)
-        token_str = self._tokenizer.decode(context, skip_special_tokens=False)
-        print("TESTES sem skip", token_str)
-        response = self.parse_response(token_str)
-        # pegar a última mensagem de assistant?
-        print("printando response", response)
-        return response
-
-#         from langchain_core.tools import tool
-# from langchain_openai import ChatOpenAI
-
-# # 1. Define the function using the @tool decorator
-# @tool
-# def multiply_numbers(a: int, b: int) -> int:
-#     """Multiply two integers together. Use this tool whenever math
-#  multiplication is required."""
-#     return a * b
-
-# # 2. Initialize your LLM model
-# model = ChatOpenAI(model="gpt-4o", temperature=0)
-
-# # 3. Bind the tool directly to the model
-# model_with_tools = model.bind_tools([multiply_numbers])
-
-# # 4. Invoke the model with a query requiring the tool
-# user_query = "What is 42 multiplied by 7?"
-# ai_message = model_with_tools.invoke(user_query)
-
-# # 5. Inspect the generated tool call payload
-# print("Tool Calls Request:")
-# print(ai_message.tool_calls)
-
-# # 6. Execute the actual function using the arguments provided by the model
-# if ai_message.tool_calls:
-#     tool_call = ai_message.tool_calls[0]
-#     arguments = tool_call["args"] # Extract arguments dictionary
-
-#     # Run the native function
-#     result = multiply_numbers.invoke(arguments)
-#     print(f"\nExecution Result: {result}")
-
-    # método para registrar calling functions
-
-    # método para invokar o modelo restritamente para calling functions
-
-    # ? métodos privados para esse fluxo de saída estruturada
-
-    # método de invokar o modelo com saída restrita (estruturada especifica 
-    # json etc, receber por parametro qual a restrição)
-    # para pode reutilizar para outras coisas, (chamada de pegar parametros, 
-    # chamada de reconhecer função, invokar o modelo para obrigar uma saída
-    # JSON estruturada especifica)
-
-    #
-
-    # pass
-
-    # método para pegar os logits dos valores restritos de tipo
-    #  (BOOLEAN, NUMBER (int e float), STRING, ETC)
-    # para cada modelo > tokenizer.encode("true") > obtém os IDs > guarda
-    #  internamente
-
-    # ppara verificar se não for igual, verifica se o estado atual inclui
-
-    # como saber quais tokens são validos: restrição em json qual algoritmo
-    # ou qual mescla de algoritmos para que seja possível mais de um modelo
-    # (por causa do tokenizador)
-
-    # conversor de SCHEMA
-
-    # parser que entende o schema e converte em validações iterativas
-    # recebendo o modelo
-
-    # método de gerar resposta comum (método) invoke
-    # método
-
-    # suporte a estrategias de
-
-#     customizar a nível de ter o padrão Strategy e por opções como:
-
-# ESCOLHA DE TOKEN:
-# Greedy
-# Sampling
-
-# VERIFICAÇÃO DE TOKEN VALIDO:
-# DFA
-# Trie
-# Grammar
-
-
-
-# classe para gerenciar estados da geração?
-# generation_state.update? 
-# teria que ter acesso ao model e etc que tem no small_llm
-
-# ESTADOS SINTÁTICOS  ->  para garantir a sintaxe do json
-# ESTADOS SEMANTICOS ->   para gerar o que tem a ver no 
-# sentido e validar tipos  esperado = integer
-#
-
+        if not grammar.is_complete(generated_text):
+            raise GenerationError(
+                "maximum generation length reached before valid JSON"
+            )
+        try:
+            raw_result: Any = json.loads(generated_text)
+        except json.JSONDecodeError as exc:
+            raise GenerationError(
+                f"decoder produced invalid JSON: {exc}"
+            ) from exc
+        result = parse_and_validate_result(
+            raw_result,
+            prompt,
+            self.function_schemas,
+        )
+        if self.verbose:
+            print(f"\n\n[call_me_maybe] result: {result.model_dump_json()}")
+        return result

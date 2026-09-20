@@ -1,13 +1,11 @@
 # ABOUTME: LLM SDK for local model inference using Hugging Face transformers.
 # ABOUTME: Provides Small_LLM_Model class for loading and running causal language models.
 
-import time
-from typing import Tuple
+from typing import Any
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenizer, PreTrainedModel, logging
 from huggingface_hub import hf_hub_download
-import os
 
 
 logging.set_verbosity_error()  # keep the console clean
@@ -73,6 +71,9 @@ class Small_LLM_Model:
         for p in self._model.parameters():
             p.requires_grad = False
 
+        self._cached_input_ids: list[int] = []
+        self._cached_past_key_values: Any = None
+
 
     def encode(self, text: str) -> torch.Tensor:
         """Tokenise *text* and return a 2-D ``input_ids`` tensor on the target device."""
@@ -91,9 +92,30 @@ class Small_LLM_Model:
         """
         Given a list of input token ids, return the raw logits (no softmax) for the next token.
         """
-        input_tensor = torch.tensor([input_ids], device=self._device, dtype=torch.long)
+        use_cache = (
+            self._cached_past_key_values is not None
+            and len(input_ids) == len(self._cached_input_ids) + 1
+            and input_ids[:-1] == self._cached_input_ids
+        )
+        if use_cache:
+            model_input_ids = [input_ids[-1]]
+            past_key_values = self._cached_past_key_values
+        else:
+            model_input_ids = input_ids
+            past_key_values = None
+        input_tensor = torch.tensor(
+            [model_input_ids],
+            device=self._device,
+            dtype=torch.long,
+        )
         with torch.no_grad():
-            out = self._model(input_ids=input_tensor)
+            out = self._model(
+                input_ids=input_tensor,
+                past_key_values=past_key_values,
+                use_cache=True,
+            )
+        self._cached_input_ids = list(input_ids)
+        self._cached_past_key_values = out.past_key_values
         # Get logits for the last token in the sequence for the batch (batch size 1)
         logits = out.logits[0, -1].tolist()
         return [float(x) for x in logits]
@@ -124,3 +146,47 @@ class Small_LLM_Model:
             filename=tokenizer_file_name
         )
         return tokenizer_path
+
+    def apply_chat_template(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        tools: list[dict[str, Any]] | None = None,
+        add_generation_prompt: bool = True,
+    ) -> str:
+        """Render messages using the selected model's chat template."""
+        rendered = self._tokenizer.apply_chat_template(
+            messages,
+            tools=tools,
+            tokenize=False,
+            add_generation_prompt=add_generation_prompt,
+        )
+        if not isinstance(rendered, str):
+            raise TypeError("the tokenizer did not return a text prompt")
+        return rendered
+
+    def get_vocabulary(self) -> dict[int, str]:
+        """Return token ids mapped to their decoded single-token text."""
+        vocabulary = self._tokenizer.get_vocab()
+        return {
+            int(token_id): self.get_token_text(int(token_id))
+            for token_id in vocabulary.values()
+        }
+
+    def get_token_text(self, token_id: int) -> str:
+        """Return the text represented by one vocabulary token id."""
+        return self._tokenizer.decode(
+            [token_id],
+            skip_special_tokens=False,
+            clean_up_tokenization_spaces=False,
+        )
+
+    def get_special_token_ids(self) -> set[int]:
+        """Return all special token ids known by the tokenizer."""
+        special_ids = self._tokenizer.all_special_ids
+        return {int(token_id) for token_id in special_ids}
+
+    def get_eos_token_id(self) -> int | None:
+        """Return the model's end-of-sequence token id when available."""
+        eos_token_id = self._tokenizer.eos_token_id
+        return int(eos_token_id) if eos_token_id is not None else None
